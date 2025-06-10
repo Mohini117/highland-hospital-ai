@@ -1,26 +1,309 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Existing variables updated to Hex */
+
+  --background-0: #ffffff;
+  --background-1: #f9fafb;
+  --background-2: #f3f4f6;
+  --background-3: #e5e7eb;
+  --background-4: #101828;
+
+  --foreground: #252525; /* Approximation of oklch(0.145 0 0) */
+
+  --card: #ffffff;
+  --card-foreground: #252525; /* Approximation of oklch(0.145 0 0) */
+  --popover: #ffffff;
+  --popover-foreground: #252525; /* Approximation of oklch(0.145 0 0) */
+
+  --primary: #1b9af5;
+  --primary-foreground: #fafafa; /* from shadcn */
+  --primary-hover: #32b7ff;
+  --primary-disabled: #1b9af5 50%;
+  --primary-subtle: #eff6ff;
+
+  --secondary: #f7f7f7; /* Approximation of oklch(0.97 0 0) */
+  --secondary-foreground: #343434; /* Approximation of oklch(0.205 0 0) */
+
+  --muted: #f7f7f7; /* Approximation of oklch(0.97 0 0) */
+  --muted-foreground: #8e8e8e; /* Approximation of oklch(0.556 0 0) */
+
+  --accent: #f7f7f7; /* Approximation of oklch(0.97 0 0) */
+  --accent-foreground: #343434; /* Approximation of oklch(0.205 0 0) */
+
+  --destructive: #e53e3e; /* Approximation of oklch(0.577 0.245 27.325) */
+
+  --border: #f3f4f6;
+  --border-2: #d1d5db;
+  --border-3: #6b7280;
+
+  --input: #ebebeb;
+  --ring: #b5b5b5;
+
+  /* Design System Additions - Light Mode */
+
+  /* Text Colors (Light) */
+  --text-title: #030712;
+  --text-body: #1f2937;
+  --text-body-subtle: #4b5563;
+  --text-caption-1: #9ca3af;
+  --text-caption-2: #ffffff;
+
+  /* Functional Colors (Light) */
+  --positive-1: #17d074;
+  --positive-2: #40e894;
+  --positive-3: #17d074 50%; /* #17D074 at 50% */
+
+  --notice-1: #ff9210;
+  --notice-2: #ffac38;
+  --notice-3: #ff9210 50%; /* #FF9210 at 50% */
+
+  --alert-1: #fa3011;
+  --alert-2: #ff7e6a;
+  --alert-3: #fa3011 50%;
+
+  /* Data Visualization Colors (Light) */
+  --data-blue: #4285f4;
+  --data-red: #db4437;
+  --data-light-blue: #4dd0e1;
+  --data-green: #0f9d58;
+  --data-yellow: #ffa000;
+  --data-purple: #673ab7;
+}
+
+.dark {
+  /* Existing variables updated to Hex */
+  --background-0: #1f2937;
+  --background-1: #030712;
+  --background-2: #111827;
+
+  --foreground: #fafafa;
+
+  --card: #343434;
+  --card-foreground: #fafafa;
+  --popover: #343434;
+  --popover-foreground: #fafafa;
+
+  --primary-foreground: #343434; /* from shadcn */
+
+  --secondary: #454545;
+  --secondary-foreground: #fafafa;
+  --muted: #454545;
+  --muted-foreground: #b5b5b5;
+  --accent: #454545;
+  --accent-foreground: #fafafa;
+  --destructive: #f56565;
+
+  --border: #111827;
+  --border-2: #374151;
+  --border-3: #6b7280;
+
+  --input: rgba(255, 255, 255, 0.15);
+  --ring: #8e8e8e;
+
+  /* Design System Additions - Dark Mode */
+
+  /* Text Colors (Dark) */
+  --text-title: #f9fafb;
+  --text-body: #e5e7eb;
+  --text-body-subtle: #9ca3af;
+  --text-caption-1: #4b5563;
 }
 
 @theme inline {
-  --color-background: var(--background);
+  /* Existing variables */
+  --color-background: var(--background-0);
+  --color-background-1: var(--background-1);
+  --color-background-2: var(--background-2);
+  --color-background-3: var(--background-3); /* Only defined in light mode */
+  --color-background-4: var(--background-4); /* Only defined in light mode */
+
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+  --color-border-3: var(--border-3);
+
+  --color-destructive: var(--destructive);
+
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-disabled: var(--primary-disabled);
+  --color-primary-subtle: var(--primary-subtle);
+
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* Design System Additions */
+
+  /* Text Colors */
+  --color-text-title: var(--text-title);
+  --color-text-body: var(--text-body);
+  --color-text-body-subtle: var(--text-body-subtle);
+  --color-text-caption-1: var(--text-caption-1);
+  --color-text-caption-2: var(--text-caption-2);
+
+  /* Stroke Colors */
+  --color-border: var(--border);
+  --color-border-2: var(--border-2);
+  --color-border-3: var(--border-3);
+
+  /* Functional Colors */
+  --color-positive-1: var(--positive-1);
+  --color-positive-2: var(--positive-2);
+  --color-positive-3: var(--positive-3);
+
+  --color-notice-1: var(--notice-1);
+  --color-notice-2: var(--notice-2);
+  --color-notice-3: var(--notice-3);
+
+  --color-alert-1: var(--alert-1);
+  --color-alert-2: var(--alert-2);
+  --color-alert-3: var(--alert-3);
+
+  /* Data Visualization Colors */
+  --color-data-blue: var(--data-blue);
+  --color-data-red: var(--data-red);
+  --color-data-light-blue: var(--data-light-blue);
+  --color-data-green: var(--data-green);
+  --color-data-yellow: var(--data-yellow);
+  --color-data-purple: var(--data-purple);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@theme {
+  /* Font Family */
+  --font-sans: "Roboto", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, SF Mono, Menlo, Monaco, Consolas,
+    "Liberation Mono", "Courier New", monospace;
+
+  /*Text sizes*/
+  --text-xs: 12px;
+  --text-xs--line-height: 18px;
+  --text-sm: 14px;
+  --text-sm--line-height: 20px;
+  --text-base: 16px;
+  --text-base--line-height: 24px;
+  --text-lg: 18px;
+  --text-lg--line-height: 28px;
+  --text-xl: 20px;
+  --text-xl--line-height: 30px;
+  --text-2xl: 24px;
+  --text-2xl--line-height: 32px;
+  --text-4xl: 36px;
+  --text-4xl--line-height: 40px;
+
+  --radius: 0.625rem; /* 10px */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 8px;
+  --radius-xl: 16px;
+  --radius-full: 999px;
+
+  /* Border Widths - Values */
+  --border-width-thin: 1px;
+  --border-width-regular: 2px;
+  --border-width-thick: 3px;
+
+  /* Effect Styles (Shadows) - Values */
+  --shadow-small: 0px 1px 2px 0px rgba(0, 0, 0, 0.05);
+  --shadow-medium: 0px 1px 4px 0px rgba(0, 0, 0, 0.15);
+  --shadow-large: 0px 1px 8px 0px rgba(0, 0, 0, 0.25);
+
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1 {
+    @apply text-3xl md:text-4xl font-bold text-text-title font-sans leading-9 md:leading-10;
+  }
+
+  h2 {
+    @apply text-xl md:text-2xl font-bold text-text-title font-sans;
+    line-height: var(--text-xl--line-height);
+    @screen md {
+      line-height: var(--text-2xl--line-height);
+    }
+  }
+
+  h3 {
+    @apply text-lg md:text-xl font-semibold text-text-title font-sans;
+    line-height: var(--text-lg--line-height);
+    @screen md {
+      line-height: var(--text-xl--line-height);
+    }
+  }
+
+  h4 {
+    @apply text-base md:text-lg font-semibold text-text-title font-sans;
+    line-height: var(--text-base--line-height);
+    @screen md {
+      line-height: var(--text-lg--line-height);
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer components {
+  .text-caption {
+    @apply text-xs text-text-caption-1 font-sans;
+    line-height: var(--text-xs--line-height);
+  }
+
+  .body-semibold {
+    @apply text-sm md:text-base font-semibold font-sans;
+    line-height: var(--text-sm--line-height);
+    @screen md {
+      line-height: var(--text-base--line-height);
+    }
+  }
+
+  .body-regular {
+    @apply text-xs md:text-sm text-text-body-subtle font-normal font-sans;
+    line-height: var(--text-xs--line-height);
+    @screen md {
+      line-height: var(--text-sm--line-height);
+    }
+  }
+
+  .body-small {
+    @apply text-xs md:text-sm text-text-body font-normal font-sans;
+    line-height: var(--text-xs--line-height);
+    @screen md {
+      line-height: var(--text-sm--line-height);
+    }
+  }
+
+  .body-small-bold {
+    @apply text-xs md:text-sm text-text-body font-bold font-sans;
+    line-height: var(--text-xs--line-height);
+    @screen md {
+      line-height: var(--text-sm--line-height);
+    }
+  }
+}
+
+@layer utilities {
 }
