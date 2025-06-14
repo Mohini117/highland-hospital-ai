@@ -231,6 +231,11 @@
 }
 
 @layer base {
+  html {
+    scroll-padding-top: 65px;
+    scroll-behavior: smooth;
+  }
+
   body {
     @apply bg-background text-foreground font-sans;
     -webkit-font-smoothing: antialiased;
