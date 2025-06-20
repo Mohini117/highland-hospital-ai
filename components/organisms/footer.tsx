@@ -1,5 +1,4 @@
 import { Phone, Mail, MapPin } from "lucide-react";
-import type { FC } from "react";
 
 export default function Footer() {
   return (

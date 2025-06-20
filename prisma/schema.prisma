@@ -10,147 +10,32 @@ generator client {
   previewFeatures = ["driverAdapters"]
 }
 
-
-
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// Enum for user roles
 enum Role {
   PATIENT
   DOCTOR
   ADMIN
 }
 
-model User {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name          String    @default("NO_NAME")
-  email         String    @unique(map: "user_email_idx")
-  password      String?
-  emailVerified DateTime? @db.Timestamp(6)
-  role          Role      @default(PATIENT)
-  isRootAdmin   Boolean?  @default(false)
-  image         String?
-
-  dateofbirth DateTime? @db.Timestamp(6)
-  phoneNumber String?
-  createdAt   DateTime  @default(now()) @db.Timestamp(6)
-  updatedAt   DateTime  @updatedAt
-  account     Account[]
-  address      String?           @map("address") @db.Text
-
-  doctorProfile       DoctorProfile?
-  DoctorLeave         DoctorLeave[]
-  // New relations for appointments
-  doctorAppointments  Appointment[]       @relation("DoctorAppointments")
-  userAppointments    Appointment[]       @relation("UserAppointments")
-  // New relations for testimonials
-  doctorTestimonials  DoctorTestimonial[] @relation("DoctorTestimonials")
-  patientTestimonials DoctorTestimonial[] @relation("PatientTestimonials")
-  transactionsAsDoctor Transaction[] @relation("DoctorTransactions")
-}
-
-model Account {
-  userId            String   @db.Uuid
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "account_userId_user_id_fk")
-
-  @@id([provider, providerAccountId], map: "account_provider_providerAccountId_pk")
-}
-
-model VerificationToken {
-  identifier String
-  token      String
-  expires    DateTime
-
-  @@id([identifier, token])
-}
-
-model DoctorProfile {
-  profileId       String   @id @default(dbgenerated("gen_random_uuid()")) @map("profile_id") @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  specialty       String
-  brief           String   @db.Text
-  credentials     String
-  languages       String[]
-  rating          Float    @default(0)
-  reviewCount     Int      @default(0) @map("review_count")
-  specializations String[]
-  isActive        Boolean  @default(true) @map("is_active")
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  // Relation to User model
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("doctor_profiles")
-}
-
+// Enum for doctor leave types
 enum LeaveType {
   FULL_DAY
   MORNING
   AFTERNOON
 }
 
-model DoctorLeave {
-  leaveId  String @id @default(dbgenerated("gen_random_uuid()")) @map("leave_id") @db.Uuid
-  doctorId String @map("doctor_id") @db.Uuid
-
-  // Store the leave date as a date (without time component)
-  leaveDate DateTime @map("leave_date") @db.Date
-
-  leaveType LeaveType @map("leave_type")
-  reason    String?   @db.Text
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
-
-  // Relation to User model
-  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
-
-  
-  @@unique([doctorId, leaveDate]) // Add a unique constraint for upserting
-
-  @@map("doctor_leave")
-}
-
-model AppSettings {
-  id                      String  @id @default("global")
-  slotsPerHour            Int     @default(2) @map("slots_per_hour")
-  startTime               String  @default("09:00") @map("start_time") // Format: "HH:MM" in 24-hour format
-  endTime                 String  @default("17:00") @map("end_time") // Format: "HH:MM" in 24-hour format
-  slotReservationDuration Int     @default(10) @map("slot_reservation_duration") // Duration in minutes
-  
-
-  @@map("app_settings")
-}
-
-model WorkingDay {
-  dayId        String  @id @default(dbgenerated("gen_random_uuid()")) @map("day_id") @db.Uuid
-  dayOfWeek    Int     @unique @map("day_of_week") @db.SmallInt
-  isWorkingDay Boolean @default(true) @map("is_working_day")
-
-  @@map("working_days")
-}
-
+// Enum for patient types in an appointment
 enum PatientType {
   MYSELF
   SOMEONE_ELSE
 }
 
-
-
+// Enum for appointment status
 enum AppointmentStatus {
   PAYMENT_PENDING
   BOOKING_CONFIRMED
@@ -160,105 +45,234 @@ enum AppointmentStatus {
   CASH
 }
 
-model Appointment {
-  appointmentId        String            @id @default(dbgenerated("gen_random_uuid()")) @map("appointment_id") @db.Uuid
-  doctorId             String            @map("doctor_id") @db.Uuid
-  userId               String?           @map("user_id") @db.Uuid // Make this optional with the ?
-  guestIdentifier      String?           @map("guest_identifier") @db.Text
-  patientType          PatientType       @map("patient_type")
-  patientRelation      String?           @map("patient_relation")
-  patientName          String            @map("patient_name")
-  paymentMethod        String?
-  paymentResult        Json?             @map("payment_result") // Added optional paymentResult as Json type
-  paidAt               DateTime?         @map("paid_at") @db.Timestamp(6) // Added optional paidAt field
-  appointmentStartUTC  DateTime          @map("appointment_start") @db.Timestamp(6)
-  appointmentEndUTC    DateTime          @map("appointment_end") @db.Timestamp(6)
-  phoneNumber          String?
-  reasonForVisit       String?           @map("reason_for_visit") @db.Text
-  additionalNotes      String?           @map("additional_notes") @db.Text
-  patientdateofbirth   DateTime?         @db.Timestamp(6)
-  reservationExpiresAt DateTime?         @map("reservation_expires_at") @db.Timestamp(6)
-  status               AppointmentStatus @default(PAYMENT_PENDING)
-  createdAt            DateTime          @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt            DateTime          @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  // Make the relation optional as well
-  doctor User  @relation("DoctorAppointments", fields: [doctorId], references: [id], onDelete: Cascade)
-  user   User? @relation("UserAppointments", fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
-  testimonials DoctorTestimonial[] 
-  @@map("appointments")
-}
-
-model DoctorTestimonial {
-  testimonialId   String   @id @default(dbgenerated("gen_random_uuid()")) @map("testimonial_id") @db.Uuid
-  appointmentId   String   @map("appointment_id") @db.Uuid
-  doctorId        String   @map("doctor_id") @db.Uuid
-  patientId       String?  @map("patient_id") @db.Uuid
-  testimonialText String   @map("testimonial_text") @db.Text
-  rating          Float?   @db.DoublePrecision
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
-
-  // Relations
-  appointment     Appointment @relation(fields: [appointmentId], references: [appointmentId], onDelete: Cascade) 
-  doctor  User  @relation("DoctorTestimonials", fields: [doctorId], references: [id], onDelete: Cascade)
-  patient User? @relation("PatientTestimonials", fields: [patientId], references: [id], onDelete: SetNull)
-
-  @@unique([appointmentId, patientId])
-  @@map("doctor_testimonials")
-}
-
+// Enum for transaction status
 enum TransactionStatus {
-  COMPLETED // Payment successful
-  FAILED    // Payment attempt failed
+  COMPLETED
+  FAILED
   CANCELLED
 }
 
-model Transaction {
-  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @map("transaction_id") @db.Uuid
-  appointmentId        String    @map("appointment_id") @db.Uuid
-  doctorId             String    @map("doctor_id") @db.Uuid
-  paymentGateway       String    // "PAYPAL"
-  gatewayTransactionId String    @unique // PayPal Order ID (capture ID for success, order ID for failure?)
-  amount               Float
-  currency             String
-  status               TransactionStatus // Uses the updated enum
-  transactionDate      DateTime  @default(now()) @map("transaction_date")
-  notes                String?   // Optional: Store error message on failure
-  paymentDetails       Json?     // Optional: Store raw gateway response
+// 1. User Table
+// Stores core information for all registered individuals.
+model User {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String   @default("NO_NAME")
+  email         String    @unique
+  password      String?
+  emailVerified DateTime?
+  role          Role      @default(PATIENT)
+  isRootAdmin   Boolean?  @default(false)
+  image         String?
+  dateofbirth   DateTime?
+  phoneNumber   String?
+  address       String?   @db.Text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // --- Relationships ---
+  accounts         Account[]
+  doctorProfile    DoctorProfile?
+  doctorLeaves     DoctorLeave[]
+  doctorAppointments Appointment[]     @relation("DoctorAppointments")
+  userAppointments Appointment[]    @relation("UserAppointments")
+  doctorTestimonials DoctorTestimonial[] @relation("DoctorTestimonials")
+  patientTestimonials DoctorTestimonial[]@relation("PatientTestimonials")
+  transactions     Transaction[]
+
+  @@map("users")
+}
+
+// 2. Account Table
+// Links user accounts to third-party authentication providers.
+model Account {
+  id                String    @id @default(cuid())
+  userId            String @db.Uuid
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?   @db.Text
+  access_token      String?   @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?   @db.Text
+  session_state     String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // --- Relationships ---
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // --- Constraints ---
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+// 3. VerificationToken Table
+// Stores tokens for verifying user actions like email confirmation.
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  // --- Constraints ---
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// 4. DoctorProfile Table
+// Stores specialized information for users with the DOCTOR role.
+model DoctorProfile {
+  profileId      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String   @unique @db.Uuid
+  specialty      String
+  brief          String   @db.Text
+  credentials    String
+  languages      String[]
+  rating         Float    @default(0)
+  reviewCount    Int      @default(0)
+  specializations String[]
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  // --- Relationships ---
+  doctor User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+ @@map("doctor_profiles")
+
+}
+
+// 5. DoctorLeave Table
+// Tracks the leave and unavailability of doctors.
+model DoctorLeave {
+  leaveId   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doctorId  String @db.Uuid
+  leaveDate DateTime  @db.Date
+  leaveType LeaveType
+  reason    String? @db.Text
+  createdAt DateTime  @default(now())
+
+  // --- Relationships ---
+  doctor User @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  // --- Constraints ---
+  @@unique([doctorId, leaveDate])
+  @@map("doctor_leaves")
+}
+
+// 6. AppSettings Table
+// Stores global application settings for appointment scheduling.
+model AppSettings {
+  id                      String @id @default("global")
+  slotsPerHour            Int    @default(2)
+  startTime               String @default("09:00")
+  endTime                 String @default("17:00")
+  slotReservationDuration Int    @default(10) // in minutes
+  @@map("app_settings")
+}
+
+// 7. WorkingDay Table
+// Defines which days of the week are considered working days.
+model WorkingDay {
+  dayId        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  dayOfWeek    Int   @unique  // Sunday=0, Monday=1, ...
+  isWorkingDay Boolean @default(true)
+  @@map("working_days")
+}
+
+// 8. Appointment Table
+// Stores all details related to a booking.
+model Appointment {
+  appointmentId        String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  doctorId             String            @db.Uuid
+  userId               String?           @db.Uuid
+  guestIdentifier      String?
+  patientType          PatientType
+  patientRelation      String?
+  patientName          String
+  paymentMethod        String?
+  paymentResult        Json?
+  paidAt               DateTime?
+  appointmentStartUTC  DateTime
+  appointmentEndUTC    DateTime
+  phoneNumber          String?
+  reasonForVisit       String?           @db.Text
+  additionalNotes      String?           @db.Text
+  patientdateofbirth   DateTime?
+  reservationExpiresAt DateTime?
+  status               AppointmentStatus @default(PAYMENT_PENDING)
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+
+  // --- Relationships ---
+  doctor      User      @relation("DoctorAppointments", fields: [doctorId], references: [id])
+  user     User?     @relation("UserAppointments", fields: [userId], references: [id])
+  testimonial DoctorTestimonial?
+  transactions Transaction[]
+  @@map("appointments")
+}
+
+// 9. DoctorTestimonial Table
+// Holds reviews and ratings submitted by patients.
+model DoctorTestimonial {
+  testimonialId String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId String    @unique @db.Uuid
+  doctorId      String    @db.Uuid
+  patientId     String    @db.Uuid
+  testimonialText String  @db.Text
+  rating        Float?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // --- Relationships ---
   appointment Appointment @relation(fields: [appointmentId], references: [appointmentId], onDelete: Cascade)
-  doctor      User        @relation("DoctorTransactions", fields: [doctorId], references: [id], onDelete: Restrict)
+  doctor      User        @relation("DoctorTestimonials", fields: [doctorId], references: [id])
+  patient     User       @relation("PatientTestimonials", fields: [patientId], references: [id])
+  @@map("doctor_testimonials")
+}
 
-  // --- Indexes ---
-  @@index([transactionDate])
-  @@index([status])
-  @@index([doctorId])
-  @@index([appointmentId])
+// 10. Transaction Table
+// Logs all financial transactions.
+model Transaction {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  appointmentId        String            @db.Uuid
+  doctorId             String            @db.Uuid
+  paymentGateway       String //PAYPAL
+  gatewayTransactionId String            @unique //PayPal - success : capture id , failure : order id
+  amount               Float
+  currency             String
+  status               TransactionStatus
+  transactionDate      DateTime          @default(now())
+  notes                String? // store any error message on failure
+  paymentDetails       Json? // raw gateway response
 
+  // --- Relationships ---
+  appointment Appointment @relation(fields: [appointmentId], references: [appointmentId],onDelete: Cascade)
+  doctor      User        @relation(fields: [doctorId], references: [id])
   @@map("transactions")
 }
 
-model BannerImage {
+// 11. BannerImage Table
+// Manages banner images for the website/application.
+model BannerImage { 
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name      String // e.g., "Welcome Banner", "Services Banner"
-  imageUrl  String   @map("image_url") // URL from UploadThing
-  fileKey   String   @unique @map("file_key") // File key from UploadThing for deletion - as admin may need to delete without replacing 
-  order     Int      // To control display order (e.g., 1, 2, 3)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
-
+  name      String
+  imageUrl  String
+  fileKey   String   @unique
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@map("banner_images")
 }
 
+// 12. Department Table
+// Stores a list of medical departments or categories.
 model Department {
   id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name      String   @unique
-  iconName  String   @map("icon_name")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp(6)
-
+  iconName  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   @@map("departments")
 }

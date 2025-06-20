@@ -1,6 +1,5 @@
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
-import { Divide, Star } from "lucide-react";
+import { Star } from "lucide-react";
 import Image from "next/image";
 import ViewProfileButton from "@/components/molecules/view-profile-button";
 

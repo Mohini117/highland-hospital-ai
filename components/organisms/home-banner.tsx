@@ -1,16 +1,24 @@
-import { bannerImageData } from "@/db/dummydata";
+//import { bannerImageData } from "@/db/dummydata";
 import Image from "next/image";
-import next from "next";
+import { getBanners } from "@/lib/actions/settings.actions";
 
-export default function DynamicBanner() {
-  if (!bannerImageData || bannerImageData.length === 0) {
+export default async function DynamicBanner() {
+  const result = await getBanners();
+
+  if (
+    !result.success ||
+    !result.data ||
+    result.data.banners.length === 0 ||
+    result.data.banners[0].imageUrl === "" ||
+    result.data.banners[0].imageUrl === null
+  ) {
     return (
       <div className="w-full text-gray-500 mt-5 h-64 md:h-80 lg:h-96 flex items-center justify-center bg-gray-100 dark:bg-gray-800">
         Banner not available
       </div>
     );
   }
-  const banner = bannerImageData[0];
+  const banner = result.data.banners[0];
 
   return (
     <section className="relative w-full h-75 md:h-100 lg:h-125 overflow-hidden">

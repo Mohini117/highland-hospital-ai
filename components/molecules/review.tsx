@@ -34,7 +34,6 @@ const StarRating = ({ rating }: { rating: number }) => {
 };
 
 export default function Review({
-  id,
   name,
   date,
   rating,

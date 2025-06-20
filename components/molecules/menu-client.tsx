@@ -9,7 +9,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { ThemeToggle } from "@/components/molecules/theme-toggle";
-import { EllipsisVertical, MoreVertical, Sun } from "lucide-react";
+import { EllipsisVertical } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import MobileUserSignOrAvatar from "@/components/molecules/mobile-user-signinoravatar";

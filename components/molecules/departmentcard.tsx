@@ -1,5 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Heart } from "lucide-react";
+
 import { getIconComponent } from "@/lib/utils";
 
 interface DepartmentCardProps {

@@ -15,24 +15,24 @@ import { Role } from "@/lib/generated/prisma";
 // --- Placeholder IDs (for demonstration purposes) ---
 // In a real script, you'd capture these from the database create operations.
 
-export const patient1Id = "1f441d07-ec16-4174-ae10-e9137b89a6c1";
-export const doctor1Id = "be230539-180c-4b44-a50f-29307e1dbfb8";
-export const doctor2Id = "b1d3a058-0685-44b9-9509-fa83c67cd078";
-export const doctor3Id = "e40dccb2-d3ea-4dac-8e22-16b6c7e9e55f";
+export const patient1Id = "b914f2c1-9cc0-4f35-8c8c-34282aa43e56";
+export const doctor1Id = "801acb38-3b13-41b3-a9c0-a5884e4dfa47";
+export const doctor2Id = "aae24f98-5ade-47f8-9a2f-40caf25b830a";
+export const doctor3Id = "fbb8c3af-fb70-4da8-84d5-12483748637c";
 
 // These IDs are placeholders. In a real seed, you'd get the actual appointment IDs after creation.
 
 export const appointmentIds = {
-  apt1: "4552b1da-8b90-4915-96b1-75041ea9b97f",
-  apt2: "4d31a639-198f-4b78-ad69-194eb43a3761",
-  apt3: "506eb8cf-6f3d-4857-b328-678150407797",
-  apt4: "61b12e2e-9f16-4da4-bf41-9983ce3199d9",
-  apt5: "9cda816f-ac1e-45e3-95e2-b215ae4dfaad",
-  apt6: "b8f12d93-839e-4404-b702-a32f256270a5",
-  apt7: "b92e4147-ce33-4cd4-8ad8-a97d79bb7ffd",
-  apt8: "c2befa49-bab5-4dfb-b21e-17c1343c902a",
-  apt9: "ca9fac3d-cfed-4b24-ac76-5a061257267f",
-  apt10: "d24c7c7a-4088-444e-bf9b-88ec28220562",
+  apt1: "0b396423-ad49-4b04-8763-11371b51100f",
+  apt2: "0ce52fa2-cf09-4f8b-ac9c-f5cff1e1adbd",
+  apt3: "2d0cc466-806c-472d-9caf-835c4aa4725e",
+  apt4: "32aa0c65-688c-42e1-92c9-60d43644d1eb",
+  apt5: "3ed3a484-f67d-42fa-bfe3-0f5f10ca4d13",
+  apt6: "6a20f32b-1c64-400e-b73a-cf91f2413529",
+  apt7: "a242b1f1-1e59-46d3-984e-e2862738b8ea",
+  apt8: "b467cd77-df29-468e-93ae-2588afc864f6",
+  apt9: "eb0ab9fc-6f77-442e-ad2c-2276782f8460",
+  apt10: "fdab53b7-47ee-4702-8070-3991e3dfd05d",
 };
 
 // =================================================================================
