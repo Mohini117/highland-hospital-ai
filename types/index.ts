@@ -29,3 +29,16 @@ export interface DoctorReview {
 }
 
 export interface BannerImageData extends BannerImage {}
+
+export interface DoctorDetails {
+  id: string;
+  name: string;
+  image: string | null;
+  credentials: string;
+  speciality: string;
+  rating: number;
+  reviewCount: number;
+  languages: string[];
+  specializations: string[];
+  brief: string;
+}
