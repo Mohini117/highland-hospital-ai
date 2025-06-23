@@ -1,6 +1,7 @@
 import { getDoctorDetails } from "@/lib/actions/doctor.actions";
 import { notFound } from "next/navigation";
 import DoctorProfileTopCard from "@/components/organisms/doctor-profile/doctorprofile-topcard";
+import DoctorProfileAbout from "@/components/organisms/doctor-profile/about";
 
 interface Params {
   doctorId: string;
@@ -67,7 +68,7 @@ export default async function DoctorProfilePage({
           brief={doctor.brief}
         />
         <div className="md:hidden">Appoint Scheduler</div>
-        <div>About Section</div>
+        <DoctorProfileAbout name={doctor.name} brief={doctor.brief} />
         <div>Reviews</div>
       </div>
       <div className="hidden md:block">Appoint Scheduler</div>
