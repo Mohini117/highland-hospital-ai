@@ -2,6 +2,7 @@ import { getDoctorDetails } from "@/lib/actions/doctor.actions";
 import { notFound } from "next/navigation";
 import DoctorProfileTopCard from "@/components/organisms/doctor-profile/doctorprofile-topcard";
 import DoctorProfileAbout from "@/components/organisms/doctor-profile/about";
+import PatientReviews from "@/components/organisms/doctor-profile/patient-reviews";
 
 interface Params {
   doctorId: string;
@@ -69,7 +70,7 @@ export default async function DoctorProfilePage({
         />
         <div className="md:hidden">Appoint Scheduler</div>
         <DoctorProfileAbout name={doctor.name} brief={doctor.brief} />
-        <div>Reviews</div>
+        <PatientReviews doctorId={doctor.id} averageRating={doctor.rating} />
       </div>
       <div className="hidden md:block">Appoint Scheduler</div>
     </div>
