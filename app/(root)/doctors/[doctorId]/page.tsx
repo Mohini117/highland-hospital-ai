@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import DoctorProfileTopCard from "@/components/organisms/doctor-profile/doctorprofile-topcard";
 import DoctorProfileAbout from "@/components/organisms/doctor-profile/about";
 import PatientReviews from "@/components/organisms/doctor-profile/patient-reviews";
-
+import AppointmentScheduler from "@/components/organisms/doctor-profile/schedule-appointment";
 interface Params {
   doctorId: string;
 }
@@ -54,8 +54,8 @@ export default async function DoctorProfilePage({
   }
 
   return (
-    <div className="w-full flex flex-col md:flex-row justify-between">
-      <div className="flex flex-col gap-6 md:gap-8 md:max-w-[908px] p-8">
+    <div className="w-full flex flex-col md:flex-row max-w-[1376px] mx-auto gap-8 p-6 md:p-8">
+      <div className="flex flex-col gap-6 md:gap-8 md:max-w-[908px] md:flex-1">
         <DoctorProfileTopCard
           id={doctor.id}
           name={doctor.name}
@@ -68,11 +68,15 @@ export default async function DoctorProfilePage({
           image={doctor.image}
           brief={doctor.brief}
         />
-        <div className="md:hidden">Appoint Scheduler</div>
+        <div className="md:hidden">
+          <AppointmentScheduler doctorId={doctor.id} />
+        </div>
         <DoctorProfileAbout name={doctor.name} brief={doctor.brief} />
         <PatientReviews doctorId={doctor.id} averageRating={doctor.rating} />
       </div>
-      <div className="hidden md:block">Appoint Scheduler</div>
+      <div className="hidden md:block ">
+        <AppointmentScheduler doctorId={doctor.id} />
+      </div>
     </div>
   );
 }
