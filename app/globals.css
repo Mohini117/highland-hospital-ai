@@ -51,6 +51,7 @@
   --text-body-subtle: #4b5563;
   --text-caption-1: #9ca3af;
   --text-caption-2: #ffffff;
+  --text-primary: #1b9af5;
 
   /* Functional Colors (Light) */
   --positive-1: #17d074;
@@ -159,6 +160,7 @@
   --color-text-body-subtle: var(--text-body-subtle);
   --color-text-caption-1: var(--text-caption-1);
   --color-text-caption-2: var(--text-caption-2);
+  --color-text-primary: var(--text-primary);
 
   /* Stroke Colors */
   --color-border: var(--border);

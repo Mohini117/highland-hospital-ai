@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SessionProvider } from "next-auth/react";
+import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -18,12 +19,12 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body>
         <SessionProvider>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            {children}
+            <Toaster position="top-right" reverseOrder={false} />
+          </ThemeProvider>
         </SessionProvider>
       </body>
     </html>
   );
 }
-
-// app/page.tsx   http://localhost:3000
-// app/toyprob4/page.jsx http://localhost:3000/toyprob4
