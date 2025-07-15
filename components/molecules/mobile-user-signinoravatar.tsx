@@ -15,6 +15,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { useSession } from "next-auth/react";
 
 interface MobileUserMenuProps {
   onMobileActionComplete?: () => void;
@@ -27,9 +28,13 @@ export default function MobileUserSignOrAvatar({
 }: MobileUserMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
+  const { data: sessionData } = useSession();
+
   if (!session?.user) {
     return <InteractiveSignInButton onNavigateStart={onMobileActionComplete} />;
   }
+
+  session = sessionData || session;
 
   const { name, image, email, role } = session.user;
   const userName = name ?? "User";
@@ -64,6 +69,7 @@ export default function MobileUserSignOrAvatar({
                 alt={userName}
                 fill
                 className="rounded-full object-cover"
+                unoptimized
               />
             ) : (
               firstInitial

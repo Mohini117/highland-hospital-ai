@@ -1,4 +1,5 @@
 import { Department, BannerImage } from "../lib/generated/prisma";
+//import { AppointmentStatus } from "../lib/generated/prisma";
 
 export type FieldErrors = Record<string, string[] | undefined>;
 
@@ -51,4 +52,26 @@ export interface TimeSlot {
   endTime: string;
   startTimeUTC: Date;
   endTimeUTC: Date;
+}
+
+export interface PatientProfile {
+  id: string;
+  name: string;
+  email: string;
+  phoneNumber?: string;
+  address?: string;
+  dateOfBirth?: string;
+  image?: string;
+}
+
+export interface Appointment {
+  id: string;
+  doctorName: string;
+  doctorId: string;
+  specialty?: string;
+  date: string;
+  time: string;
+  status: "upcoming" | "completed" | "cancelled" | "no show" | "cash payment";
+  reasonForVisit?: string;
+  isReviewed?: boolean;
 }

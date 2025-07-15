@@ -65,7 +65,7 @@ export const config: NextAuthConfig = {
   callbacks: {
     ...authConfig.callbacks, // Import the authorized callback
 
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       // On initial sign-in, populate the token with user data
       if (user) {
         token.sub = user.id;
@@ -77,19 +77,25 @@ export const config: NextAuthConfig = {
       }
 
       // On subsequent requests, refresh token data if needed
-      if (token.sub) {
-        const existingUser = await prisma.user.findUnique({
-          where: { id: token.sub },
-        });
+      if (trigger === "update" && session?.user) {
+        // const existingUser = await prisma.user.findUnique({
+        //   where: { id: token.sub },
+        // });
 
         // If user not found, something is wrong
-        if (!existingUser) return null;
+        // if (!existingUser) return null;
 
         // Keep token data fresh
-        token.role = existingUser.role;
-        token.name = existingUser.name;
-        token.email = existingUser.email;
-        token.picture = existingUser.image;
+        // token.role = existingUser.role;
+        // token.name = existingUser.name;
+        // token.email = existingUser.email;
+        // token.picture = existingUser.image;
+        if (session.user.image) {
+          token.picture = session.user.image;
+        }
+        if (session.user.name) {
+          token.name = session.user.name;
+        }
       }
 
       return token;

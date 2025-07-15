@@ -45,6 +45,8 @@ enum AppointmentStatus {
   CASH
 }
 
+
+
 // Enum for transaction status
 enum TransactionStatus {
   COMPLETED
