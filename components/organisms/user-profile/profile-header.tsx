@@ -45,7 +45,7 @@ ProfileHeaderProps) {
 
   // --- Render ---
   return (
-    <div className="flex items-center gap-6">
+    <div className="flex items-center gap-6 mb-10 md:mb-12">
       {/* Avatar and Upload Button Container */}
       <div className="relative group">
         <Avatar className="w-24 h-24 text-3xl ">

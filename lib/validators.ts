@@ -35,3 +35,48 @@ export const signUpFormSchema = z
     message: "Passwords don't match",
     path: ["confirmPassword"],
   });
+
+// const maxDate = new Date();
+// // The minimum date is 120 years ago from today.
+// const minDate = new Date();
+// minDate.setFullYear(maxDate.getFullYear() - 120);
+
+export const patientProfileUpdateSchema = z.object({
+  name: z
+    .string({
+      required_error: "Name is required.",
+    })
+    .min(3, { message: "Name must be at least 3 characters long." }),
+
+  phoneNumber: z
+    .string()
+    .min(7, { message: "Phone number must be at least 7 characters long." })
+    .max(20, { message: "Phone number cannot be longer than 20 characters." })
+    .regex(/^[0-9+-]+$/, {
+      message: "Phone number can only contain numbers, '+', or '-'.",
+    })
+    .optional(),
+
+  address: z.string().optional(),
+
+  dateOfBirth: z
+    .string()
+    .optional()
+    .or(z.literal("")) // Allow empty string for optional field
+    .refine(
+      (date) => {
+        if (!date) return true;
+        return new Date(date) <= new Date();
+      },
+      { message: "Date of Birth cannot be in the future" }
+    )
+    .refine(
+      (date) => {
+        if (!date) return true;
+        const minDate = new Date();
+        minDate.setFullYear(new Date().getFullYear() - 120);
+        return new Date(date) >= minDate;
+      },
+      { message: "You must be younger than 120 years old to register" }
+    ),
+});

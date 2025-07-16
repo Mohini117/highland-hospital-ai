@@ -1,6 +1,15 @@
 "use server";
-import { ServerActionResponse, PatientProfile, Appointment } from "@/types";
-import { signInFormSchema, signUpFormSchema } from "@/lib/validators";
+import {
+  ServerActionResponse,
+  PatientProfile,
+  Appointment,
+  ProfileUpdateInput,
+} from "@/types";
+import {
+  signInFormSchema,
+  signUpFormSchema,
+  patientProfileUpdateSchema,
+} from "@/lib/validators";
 import { signIn, signOut } from "@/auth";
 import { AuthError } from "next-auth";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
@@ -480,6 +489,71 @@ export async function updateProfileImage(
       success: false,
       message: "Failed to update profile image. Please try again later.",
       error: error instanceof Error ? error.message : "Unknown error",
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function updateUserProfile(
+  data: ProfileUpdateInput
+): Promise<ServerActionResponse> {
+  // 1. Authentication: Get the current user session
+  // This is a placeholder for your actual authentication logic (e.g., from NextAuth.js)
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      success: false,
+      message: "User not authenticated",
+      error: "Unauthorized. You must be logged in to update your profile.",
+      errorType: "authentication",
+    };
+  }
+  const userId = session.user.id;
+
+  // 2. Validation: Validate the incoming data against the schema
+  const validatedFields = patientProfileUpdateSchema.safeParse(data);
+
+  if (!validatedFields.success) {
+    return {
+      success: false,
+      message: "Validation failed. Please check the fields.",
+      fieldErrors: validatedFields.error.flatten().fieldErrors,
+      errorType: "VALIDATION_ERROR",
+    };
+  }
+
+  // 3. Database Operation: Update the user record in the database
+  try {
+    const { name, phoneNumber, address, dateOfBirth } = validatedFields.data;
+
+    await prisma.user.update({
+      where: {
+        id: userId,
+      },
+      data: {
+        name,
+        phoneNumber,
+        address,
+        // The prisma model uses 'dateofbirth' (lowercase o)
+        dateofbirth: dateOfBirth ? new Date(dateOfBirth) : null,
+      },
+    });
+
+    revalidatePath("/user/profile"); // Revalidate the user profile page to reflect changes immediately
+
+    return {
+      success: true,
+      message: "Profile updated successfully.",
+    };
+  } catch (error) {
+    // Log the error for debugging purposes
+    console.error("Failed to update user profile:", error);
+
+    // Return a generic error response to the client
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+      message: "Failed to update profile. Please try again later.",
       errorType: "SERVER_ERROR",
     };
   }
