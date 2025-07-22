@@ -22,9 +22,11 @@ export default function ErrorNotification(): React.ReactNode {
 
   useEffect(() => {
     // Read the 'message' parameter from the URL
-    const message = searchParams.get("message");
+    const encodedMessage = searchParams.get("message");
 
-    if (message) {
+    if (encodedMessage) {
+      const message = decodeURIComponent(encodedMessage);
+
       // If a message exists, update the state to display the banner
       setErrorMessage(message);
       setIsVisible(true);
@@ -52,13 +54,15 @@ export default function ErrorNotification(): React.ReactNode {
 
   return (
     <div
-      className="fixed top-4 left-1/2 -translate-x-1/2 w-11/12 max-w-2xl bg-background-1 text-white p-4 rounded-lg shadow-lg z-50 flex items-center justify-between border border-red-500"
+      className="fixed top-4 left-1/2 -translate-x-1/2 w-11/12 max-w-2xl bg-background-1 text-white p-4 rounded-lg shadow-lg z-50 flex items-start justify-between border border-red-500"
       role="alert"
     >
-      <div className="flex items-center gap-3 flex-grow min-w-0">
+      <div className="flex items-start gap-3 flex-grow min-w-0">
         <AlertCircle className="h-5 w-5 flex-shrink-0 text-red-500" />
         {/* Error Message */}
-        <p className="font-medium text-sm text-text-title">{errorMessage}</p>
+        <p className="font-medium text-sm text-text-title break-words">
+          {errorMessage}
+        </p>
       </div>
       {/* Dismiss Button */}
       <button
