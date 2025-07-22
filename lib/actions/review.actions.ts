@@ -3,6 +3,10 @@ import { ServerActionResponse, DoctorReview } from "@/types";
 import { getAppTimeZone } from "@/lib/config";
 import { prisma } from "@/db/prisma";
 import { format, toZonedTime } from "date-fns-tz";
+import { auth } from "@/auth";
+import { fullReviewDataSchema } from "@/lib/validators";
+import { AppointmentStatus } from "@/lib/generated/prisma";
+import { revalidatePath } from "next/cache";
 
 export async function getDoctorTestimonials(): Promise<
   ServerActionResponse<DoctorReview[]>
@@ -183,6 +187,124 @@ export async function getDoctorReviewsPaginated(
       message: "failed to fetch doctor reviews",
       error:
         error instanceof Error ? error.message : "An unknown error occurred.",
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function submitPatientReview(clientData: {
+  appointmentId: string;
+  doctorId: string;
+  rating: number;
+  reviewText: string;
+}): Promise<ServerActionResponse> {
+  // 1. Check user authentication
+  const session = await auth();
+  if (!session?.user?.id) {
+    return {
+      success: false,
+      message: "Authentication required. Please log in to submit a review.",
+      errorType: "Unauthorized",
+    };
+  }
+  const patientId = session.user.id;
+
+  // 2. Validate the input data against the Zod schema
+  const fullData = { ...clientData, patientId };
+  const validationResult = fullReviewDataSchema.safeParse(fullData);
+
+  if (!validationResult.success) {
+    return {
+      success: false,
+      message: "Invalid data provided. Please check your input.",
+      fieldErrors: validationResult.error.flatten().fieldErrors,
+      errorType: "Validation Error",
+    };
+  }
+
+  const { appointmentId, doctorId, rating, reviewText } = validationResult.data;
+
+  try {
+    // 3. Use a transaction to ensure all database operations succeed or fail together
+    await prisma.$transaction(async (tx) => {
+      // 3a. Find the appointment and verify its status and ownership
+      const appointment = await tx.appointment.findUnique({
+        where: { appointmentId },
+        include: { testimonial: true }, // Check if a testimonial already exists
+      });
+
+      if (!appointment) {
+        throw new Error("Appointment not found.");
+      }
+      if (appointment.status !== AppointmentStatus.COMPLETED) {
+        throw new Error(
+          "Reviews can only be submitted for completed appointments."
+        );
+      }
+      if (appointment.userId !== patientId) {
+        throw new Error("You are not authorized to review this appointment.");
+      }
+      if (appointment.testimonial) {
+        throw new Error(
+          "A review has already been submitted for this appointment."
+        );
+      }
+
+      // 3b. Create the new testimonial
+      await tx.doctorTestimonial.create({
+        data: {
+          appointmentId,
+          doctorId,
+          patientId,
+          rating,
+          testimonialText: reviewText,
+        },
+      });
+
+      // 3c. Calculate the new average rating and review count for the doctor
+      const stats = await tx.doctorTestimonial.aggregate({
+        where: { doctorId },
+        _avg: {
+          rating: true,
+        },
+        _count: {
+          testimonialId: true,
+        },
+      });
+
+      const reviewCount = stats._count.testimonialId;
+      const averageRating = stats._avg.rating || 0;
+
+      // 3d. Update the doctor's profile with the new stats
+      await tx.doctorProfile.update({
+        where: { userId: doctorId },
+        data: {
+          reviewCount,
+          rating: parseFloat(averageRating.toFixed(1)), // Store with 1 decimal places
+        },
+      });
+
+      //return testimonial;
+    });
+
+    // 4. Revalidate paths to update the UI
+    revalidatePath(`/user/profile`); // Revalidate
+
+    // 5. Return a success response
+    return {
+      success: true,
+      message: "Your review has been submitted successfully!",
+      //data: newTestimonial,
+    };
+  } catch (error) {
+    // 6. Handle any errors that occurred during the process
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+    console.error("Error submitting patient review:", error);
+    return {
+      success: false,
+      message: errorMessage,
+      error: errorMessage,
       errorType: "SERVER_ERROR",
     };
   }

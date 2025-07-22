@@ -22,7 +22,7 @@
   --primary: #1b9af5;
   --primary-foreground: #fafafa; /* from shadcn */
   --primary-hover: #32b7ff;
-  --primary-disabled: #1b9af5 50%;
+  --primary-disabled: #1b9af580;
   --primary-subtle: #eff6ff;
 
   --secondary: #f7f7f7; /* Approximation of oklch(0.97 0 0) */
@@ -56,15 +56,15 @@
   /* Functional Colors (Light) */
   --positive-1: #17d074;
   --positive-2: #40e894;
-  --positive-3: #17d074 50%; /* #17D074 at 50% */
+  --positive-3: #17d07480; /* #17D074 at 50% */
 
   --notice-1: #ff9210;
   --notice-2: #ffac38;
-  --notice-3: #ff9210 50%; /* #FF9210 at 50% */
+  --notice-3: #ff921080; /* #FF9210 at 50% */
 
   --alert-1: #fa3011;
   --alert-2: #ff7e6a;
-  --alert-3: #fa3011 50%;
+  --alert-3: #fa301180;
 
   /* Data Visualization Colors (Light) */
   --data-blue: #4285f4;

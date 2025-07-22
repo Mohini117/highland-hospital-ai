@@ -8,6 +8,17 @@ export default function Examples() {
     name: "Dermatology",
     iconName: "Syringe",
   };
+  // const demo_appointment: Appointment = {
+  //   id: "appt-1",
+  //   doctorName: "Dr. John Doe",
+  //   doctorId: "doc-1",
+  //   specialty: "Dermatology",
+  //   date: "1 January 2030",
+  //   time: "10:00 AM",
+  //   status: "completed",
+  //   reasonForVisit: "Skin check-up",
+  //   isReviewed: false,
+  // };
   return (
     <div className="flex flex-col justify-center items-center mt-10">
       <div className="max-w-[176px]">
@@ -46,6 +57,19 @@ export default function Examples() {
         date="2026-01-15"
         imageSrc="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8eW91bmclMjBtYW58ZW58MHx8MHx8fDA%3D"
       />
+      <br />
+
+      <br />
+      <br />
+      <br />
+      <br />
+      <br />
+      <br />
+      <br />
+      <br />
+      <br />
+      <br />
+      <br />
       <br />
       <br />
     </div>

@@ -1,4 +1,4 @@
-import { patientProfileUpdateSchema } from "@/lib/validators";
+import { patientProfileUpdateSchema, reviewFormSchema } from "@/lib/validators";
 import { Department, BannerImage } from "../lib/generated/prisma";
 //import { AppointmentStatus } from "../lib/generated/prisma";
 import { z } from "zod";
@@ -79,3 +79,5 @@ export interface Appointment {
 }
 
 export type ProfileUpdateInput = z.infer<typeof patientProfileUpdateSchema>;
+
+export type ReviewFormValues = z.infer<typeof reviewFormSchema>;
