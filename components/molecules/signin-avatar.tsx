@@ -8,5 +8,5 @@ export default async function SigninOrAvatar() {
     return <InteractiveSignInButton />;
   }
 
-  return <ClientAvatar session={session} />;
+  return <ClientAvatar key={session.user.id} session={session} />;
 }

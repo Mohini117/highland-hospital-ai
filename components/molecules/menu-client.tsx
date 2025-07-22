@@ -95,6 +95,7 @@ export default function MenuClient({
 
             <SheetFooter className="w-full p-0">
               <MobileUserSignOrAvatar
+                key={session?.user?.id}
                 onMobileActionComplete={closeMobileMenu}
                 session={session}
               />
