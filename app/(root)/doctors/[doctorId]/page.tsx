@@ -4,6 +4,9 @@ import DoctorProfileTopCard from "@/components/organisms/doctor-profile/doctorpr
 import DoctorProfileAbout from "@/components/organisms/doctor-profile/about";
 import PatientReviews from "@/components/organisms/doctor-profile/patient-reviews";
 import AppointmentScheduler from "@/components/organisms/doctor-profile/schedule-appointment";
+import { auth } from "@/auth";
+import { cleanupExpiredReservations } from "@/lib/actions/appointment.actions";
+
 interface Params {
   doctorId: string;
 }
@@ -15,6 +18,9 @@ export default async function DoctorProfilePage({
 }) {
   const doctorIdObject = await params;
   const { doctorId } = doctorIdObject;
+
+  await cleanupExpiredReservations();
+
   let doctorActionResponse;
   try {
     doctorActionResponse = await getDoctorDetails(doctorId);
@@ -53,6 +59,10 @@ export default async function DoctorProfilePage({
     notFound();
   }
 
+  const session = await auth();
+  const userId = session?.user?.id ? session.user.id : undefined;
+  const userRole = session?.user?.role ? session.user.role : undefined;
+
   return (
     <div className="w-full flex flex-col md:flex-row max-w-[1376px] mx-auto gap-8 p-6 md:p-8">
       <div className="flex flex-col gap-6 md:gap-8 md:max-w-[908px] md:flex-1">
@@ -69,13 +79,21 @@ export default async function DoctorProfilePage({
           brief={doctor.brief}
         />
         <div className="md:hidden">
-          <AppointmentScheduler doctorId={doctor.id} />
+          <AppointmentScheduler
+            doctorId={doctor.id}
+            userId={userId}
+            userRole={userRole}
+          />
         </div>
         <DoctorProfileAbout name={doctor.name} brief={doctor.brief} />
         <PatientReviews doctorId={doctor.id} averageRating={doctor.rating} />
       </div>
       <div className="hidden md:block ">
-        <AppointmentScheduler doctorId={doctor.id} />
+        <AppointmentScheduler
+          doctorId={doctor.id}
+          userId={userId}
+          userRole={userRole}
+        />
       </div>
     </div>
   );

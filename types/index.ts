@@ -81,3 +81,27 @@ export interface Appointment {
 export type ProfileUpdateInput = z.infer<typeof patientProfileUpdateSchema>;
 
 export type ReviewFormValues = z.infer<typeof reviewFormSchema>;
+
+export interface GuestAppointmentParams {
+  doctorId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}
+
+export interface GuestAppointmentSuccessData {
+  appointmentId: string;
+  guestIdentifier: string;
+}
+
+export interface ReservationSuccessData {
+  appointmentId: string;
+}
+
+export interface AppointmentReservationParams {
+  doctorId: string;
+  userId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+}

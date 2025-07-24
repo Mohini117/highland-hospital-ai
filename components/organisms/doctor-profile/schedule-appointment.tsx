@@ -2,11 +2,13 @@
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { useAppointmentSlots } from "@/hooks/useAppointmentSlots";
+import { useAppointmentReservation } from "@/hooks/useAppointmentReservation";
 import { useState, useEffect } from "react";
 import { TimeSlot } from "@/types";
 import { startOfMonth, addMonths, startOfDay, isAfter } from "date-fns";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 interface AppointmentSchedulerProps {
   doctorId: string;
@@ -29,6 +31,14 @@ export default function AppointmentScheduler({
     isLoading,
     fetchSlotsForDate,
   } = useAppointmentSlots(doctorId, userId);
+
+  const { mutate: reserveApointment, isPending } = useAppointmentReservation({
+    userId,
+    onConflict: () => {
+      setSelectedSlot(null);
+      if (selectedDate) fetchSlotsForDate(selectedDate);
+    },
+  });
 
   // 2. Local state for UI interaction
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
@@ -58,9 +68,20 @@ export default function AppointmentScheduler({
 
   // 4. Handlers for user interaction
   const handleReservation = () => {
-    alert(
-      "Continue to Next Step button clicked! Check the console for details."
-    );
+    // Ensure a date and slot are selected before proceeding.
+    // The button's disabled state should prevent this, but it's a good safeguard.
+    if (!selectedDate || !selectedSlot) {
+      console.error("A date and time slot must be selected.");
+      return;
+    }
+    // Call the mutate function from the useAppointmentReservation hook
+    // with the required payload.
+    reserveApointment({
+      doctorId,
+      date: format(selectedDate, "yyyy-MM-dd"), // Format date to YYYY-MM-DD
+      startTime: selectedSlot.startTime,
+      endTime: selectedSlot.endTime,
+    });
   };
 
   const handleDateSelect = (date: Date | undefined) => {
@@ -97,6 +118,11 @@ export default function AppointmentScheduler({
   const today = new Date();
   //const fromDate = today;
   const toDate = addMonths(today, 2);
+
+  const getButtonText = () => {
+    if (userRole === "ADMIN") return "Admins cannot Book";
+    return "Continue to Next Step";
+  };
 
   return (
     <div className="bg-background p-6 rounded-lg shadow-small max-w-md mx-auto md:flex-1">
@@ -166,10 +192,11 @@ export default function AppointmentScheduler({
       <div className="mt-6">
         <Button
           onClick={handleReservation}
-          disabled={!selectedSlot || isLoading}
+          disabled={!selectedSlot || isLoading || userRole === "ADMIN"}
           className="w-full py-6 body-semibold text-text-caption-2 mb-20"
         >
-          Continue to Next Step
+          {isPending && <Loader2 className="animate-spin mr-2 h-4 w-4" />}
+          {getButtonText()}
         </Button>
       </div>
     </div>
