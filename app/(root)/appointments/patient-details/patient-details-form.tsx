@@ -290,10 +290,19 @@ export default function PatientDetailsForm({
                 />
 
                 {/* <Pencil className="h-4 w-4 text-muted-foreground" /> */}
-                <MdEdit
-                  size={16}
-                  className="text-primary absolute right-3 top-1/2 -translate-y-1/2"
-                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                  onClick={() =>
+                    router.push(
+                      `/user/profile?appointmentId=${appointmentData.appointmentId}`
+                    )
+                  }
+                >
+                  <MdEdit size={16} className="text-primary " />
+                </Button>
               </div>
               <p className="text-caption">
                 To update your name please visit your profile.
@@ -334,10 +343,19 @@ export default function PatientDetailsForm({
               />
 
               {/* <span className="text-blue-600">📞</span> */}
-              <MdPhone
-                size={16}
-                className="text-primary absolute right-3 top-1/2 -translate-y-1/2"
-              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
+                onClick={() =>
+                  router.push(
+                    `/user/profile?appointmentId=${appointmentData.appointmentId}`
+                  )
+                }
+              >
+                <MdPhone size={16} className="text-primary " />
+              </Button>
             </div>
             <p className="text-caption">
               This is your profile phone number. To update it, please visit your

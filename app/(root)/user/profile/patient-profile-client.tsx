@@ -17,7 +17,7 @@ import ReviewDialog from "@/components/molecules/user-profile/review-dialog";
 export default function PatientProfileClient({
   patientData,
   appointments,
-  // appointmentId,
+  appointmentId,
   totalPages,
   currentPage,
   appointmentsError,
@@ -122,7 +122,7 @@ export default function PatientProfileClient({
 
   return (
     <div className="min-h-screen bg-background-1 max-w-[1440px] mx-auto p-6 md:p-8">
-      <ProfileHeader patientData={patientData} />
+      <ProfileHeader patientData={patientData} appointmentId={appointmentId} />
       <PersonalInformation
         patientData={patientData}
         onEdit={() => setEditProfileModalOpen(true)}

@@ -7,6 +7,8 @@ import { useSession } from "next-auth/react";
 import toast from "react-hot-toast";
 import { Camera, Loader2 } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 
 interface ProfileHeaderProps {
   patientData: PatientProfile;
@@ -15,14 +17,15 @@ interface ProfileHeaderProps {
 
 export default function ProfileHeader({
   patientData,
-}: // appointmentId,
-ProfileHeaderProps) {
+  appointmentId,
+}: ProfileHeaderProps) {
   // --- State and Hooks ---
   const { data: session, update: updateSession } = useSession();
   const [currentImage, setCurrentImage] = useState<string | undefined>(
     patientData.image
   );
   const [isProcessing, setIsProcessing] = useState(false);
+  const router = useRouter();
 
   // --- Handlers ---
 
@@ -41,6 +44,18 @@ ProfileHeaderProps) {
   const handleUploadError = (error: Error) => {
     toast.error(`Upload failed: ${error.message}`);
     setIsProcessing(false);
+  };
+
+  const handleReturnToBooking = () => {
+    if (appointmentId) {
+      router.push(
+        `/appointments/patient-details?appointmentId=${appointmentId}`
+      );
+    } else {
+      toast.error(
+        "Could not find the appointment details. Please make a fresh appointment"
+      );
+    }
   };
 
   // --- Render ---
@@ -138,6 +153,18 @@ ProfileHeaderProps) {
 
       {/* User Name */}
       <h2 className="text-text-title">{patientData.name}</h2>
+      <div className="ml-auto">
+        {appointmentId && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-text-body hover:bg-accent"
+            onClick={handleReturnToBooking}
+          >
+            Return to Booking
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
