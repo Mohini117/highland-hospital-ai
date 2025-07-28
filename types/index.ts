@@ -1,4 +1,8 @@
-import { patientProfileUpdateSchema, reviewFormSchema } from "@/lib/validators";
+import {
+  patientProfileUpdateSchema,
+  reviewFormSchema,
+  PatientDetailsFormSchema,
+} from "@/lib/validators";
 import { Department, BannerImage } from "../lib/generated/prisma";
 //import { AppointmentStatus } from "../lib/generated/prisma";
 import { z } from "zod";
@@ -105,3 +109,41 @@ export interface AppointmentReservationParams {
   startTime: string;
   endTime: string;
 }
+
+export interface AppointmentData {
+  appointmentId: string;
+  doctorId: string;
+  doctorName: string;
+  doctorSpecilaity: string;
+  doctorImage?: string | null;
+  date: string;
+  timeSlot: string;
+  endTime: string;
+  patientType?: "MYSELF" | "SOMEONE_ELSE";
+  patientName?: string;
+  patientdateofbirth?: Date | null;
+  phoneNumber?: string | null;
+  reasonForVisit?: string | null;
+  additionalNotes?: string | null;
+  relationship?: string | null;
+}
+
+export interface PatientData {
+  name: string;
+  email: string;
+  phoneNumber: string;
+  dateOfBirth: string;
+}
+
+export type PatientDetailsFormValues = z.infer<typeof PatientDetailsFormSchema>;
+
+export type AppointmentSubmissionData = PatientDetailsFormValues & {
+  appointmentId: string;
+  doctorId: string;
+  date: string;
+  timeSlot: string;
+  endTime: string;
+  isForSelf: boolean;
+  phone: string | null | undefined;
+  patientdateofbirth?: string;
+};

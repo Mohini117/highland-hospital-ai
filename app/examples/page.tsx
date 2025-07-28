@@ -1,6 +1,7 @@
 import DepartmentCard from "@/components/molecules/departmentcard";
 import DoctorCard from "@/components/molecules/doctorcard";
 import Review from "@/components/molecules/review";
+import BookingSteps from "@/components/molecules/booking-steps";
 
 export default function Examples() {
   const sampleDepartment = {
@@ -58,7 +59,7 @@ export default function Examples() {
         imageSrc="https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=900&auto=format&fit=crop&q=60&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NHx8eW91bmclMjBtYW58ZW58MHx8MHx8fDA%3D"
       />
       <br />
-
+      <BookingSteps currentStep={2} />
       <br />
       <br />
       <br />

@@ -6,15 +6,7 @@ import PatientProfileClient from "./patient-profile-client";
 import { PatientProfile, Appointment } from "@/types";
 import { PAGE_SIZE } from "@/lib/constants";
 import { redirect, notFound } from "next/navigation";
-
-const redirectToErrorPage = (errorType: string, errorMessage: string) => {
-  const searchParams = new URLSearchParams({
-    error: errorType,
-    message: encodeURIComponent(errorMessage),
-  });
-  // Redirect to the root path with error info
-  redirect(`/?${searchParams.toString()}`);
-};
+import { redirectToErrorPage } from "@/lib/config";
 
 interface SearchParams {
   page?: string;
