@@ -8,7 +8,12 @@ import {
   AppointmentSubmissionData,
 } from "@/types";
 import { prisma } from "@/db/prisma";
-import { AppointmentStatus, Prisma } from "@/lib/generated/prisma";
+import {
+  AppointmentStatus,
+  Prisma,
+  TransactionStatus,
+  Appointment,
+} from "@/lib/generated/prisma";
 import { getAppTimeZone } from "@/lib/config";
 import { toZonedTime, format, fromZonedTime } from "date-fns-tz";
 import { v4 as uuidv4 } from "uuid";
@@ -17,6 +22,7 @@ import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import { PatientDetailsFormSchema } from "@/lib/validators";
 import { parse, isValid } from "date-fns";
+import { paypal } from "@/lib/paypal";
 
 interface PendingAppointmentParams {
   userId: string;
@@ -669,12 +675,14 @@ export async function processAppointmentBooking(
     // Parse patient's date of birth if provided
     let patientDob: Date | null = null;
     if (
-      validatedData.patientType === "SOMEONE_ELSE" &&
-      validatedData.dateOfBirth
+      // validatedData.patientType === "SOMEONE_ELSE" &&
+      // validatedData.dateOfBirth
+      data.patientdateofbirth
     ) {
       const parsedDob = parse(
-        validatedData.dateOfBirth,
-        "dd/MM/yyyy",
+        data.patientdateofbirth,
+        // "dd/MM/yyyy",
+        "yyyy-MM-dd",
         new Date()
       );
       if (isValid(parsedDob)) {
@@ -792,6 +800,327 @@ export async function processAppointmentBooking(
       success: false,
       message: "An unexpected server error occurred. Please try again later.",
       error: error instanceof Error ? error.message : "An unkown error occured",
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+interface PayPalOrderSuccessData {
+  orderId: string;
+}
+
+export async function createPayPalOrder(
+  appointmentId: string
+): Promise<ServerActionResponse<PayPalOrderSuccessData>> {
+  // 1. Validate input
+  if (!appointmentId) {
+    return {
+      success: false,
+      message: "Appointment ID is required.",
+      errorType: "validation_error",
+    };
+  }
+
+  try {
+    // 2. Verify the appointment exists
+    const appointment = await prisma.appointment.findUnique({
+      where: { appointmentId },
+    });
+
+    if (!appointment) {
+      return {
+        success: false,
+        message: `Appointment with ID ${appointmentId} not found.`,
+        errorType: "not_found",
+      };
+    }
+
+    // The price is fixed at $150
+    const price = 150;
+
+    // 3. Create the PayPal order
+    // The paypal.createOder function will throw an error on failure, which will be caught below.
+    const payPalOrder = await paypal.createOder(price);
+
+    // 4. Check for a valid order ID from PayPal
+    if (!payPalOrder || !payPalOrder.id) {
+      console.error("PayPal order creation failed:", payPalOrder);
+      return {
+        success: false,
+        message: "Failed to create PayPal order. Invalid response from PayPal.",
+        errorType: "api_error",
+      };
+    }
+
+    const orderId = payPalOrder.id;
+
+    // 5. Update the appointment record with PayPal details
+    await prisma.appointment.update({
+      where: {
+        appointmentId: appointmentId,
+      },
+      data: {
+        paymentMethod: "PayPal",
+        paymentResult: {
+          id: orderId,
+          pricePaid: 0, // Payment is not captured yet
+          status: payPalOrder.status || "CREATED", // Status from PayPal response
+          email_address: "", // Not available at order creation
+        },
+      },
+    });
+
+    // 6. Return a successful response
+    return {
+      success: true,
+      message: "PayPal order created successfully.",
+      data: {
+        orderId: orderId,
+      },
+    };
+  } catch (error) {
+    // 7. Handle any errors during the process
+    console.error("Error in createPayPalOrder:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+
+    return {
+      success: false,
+      message: `Server error: ${errorMessage}`,
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function approvePayPalOrder(
+  appointmentId: string,
+  data: { orderId: string }
+): Promise<ServerActionResponse> {
+  const { orderId } = data;
+
+  // 1. Validate input
+  if (!appointmentId || !orderId) {
+    return {
+      success: false,
+      message: "Appointment ID and Order ID are required.",
+      errorType: "validation_error",
+    };
+  }
+
+  // 2. Fetch the appointment to get the doctorId and verify its existence
+  const appointment = await prisma.appointment.findUnique({
+    where: { appointmentId },
+    select: { doctorId: true },
+  });
+
+  if (!appointment) {
+    return {
+      success: false,
+      message: `Appointment with ID ${appointmentId} not found.`,
+      errorType: "not_found",
+    };
+  }
+
+  let transactionStatus: TransactionStatus = TransactionStatus.FAILED;
+  let errorMessage: string | null = null;
+  let captureData;
+
+  //capture payment
+  try {
+    // 3. Capture the payment using the PayPal service
+    captureData = await paypal.capturePayment(orderId);
+
+    // 4. Check for a successful capture status from PayPal
+    if (captureData.status === "COMPLETED") {
+      // 6. Call the function to update the appointment status to paid (placeholder)
+      await updateAppointmentToPaid({
+        appointmentId: appointmentId,
+        paymentResult: {
+          id: captureData.id,
+          status: captureData.status,
+          email_address: captureData.payer.email_address,
+          pricePaid:
+            captureData.purchase_units[0]?.payments?.captures[0]?.amount?.value,
+        },
+      });
+      transactionStatus = TransactionStatus.COMPLETED;
+    } else {
+      errorMessage = `Paypal capture status was ${
+        captureData?.status || "unkown"
+      }`;
+    }
+  } catch (error) {
+    errorMessage =
+      error instanceof Error
+        ? error.message
+        : "unknown error during Paypal approval";
+    console.error(errorMessage);
+  }
+
+  //is to make an entry in the transaction table
+  try {
+    const captureDetails =
+      captureData?.purchase_units[0]?.payments?.captures[0];
+
+    // 5. Create a record for the successful transaction
+    await prisma.transaction.create({
+      data: {
+        appointmentId: appointmentId,
+        doctorId: appointment.doctorId,
+        paymentGateway: "PayPal",
+        gatewayTransactionId: captureDetails?.id || data.orderId, // Use the capture ID for successful transactions
+        amount: parseFloat(captureDetails?.amount?.value ?? "0"),
+        currency: captureDetails?.amount?.currency_code || "USD",
+        status: transactionStatus,
+        paymentDetails: captureData ? captureData : Prisma.JsonNull, // Store the full raw response
+        transactionDate: new Date(),
+        notes:
+          transactionStatus === TransactionStatus.FAILED ? errorMessage : null,
+      },
+    });
+  } catch (dbError) {
+    console.error(`Failed to create transaction record`, dbError);
+  }
+
+  if (transactionStatus === TransactionStatus.COMPLETED) {
+    return {
+      success: true,
+      message: "Appointment booking confirmed",
+    };
+  } else {
+    return {
+      success: false,
+      message: errorMessage || "Failed to process paypal payment",
+      errorType: "PAYMENT_GATEWAY_ERROR",
+    };
+  }
+}
+
+export async function updateAppointmentToPaid({
+  appointmentId,
+  paymentResult,
+}: {
+  appointmentId: string;
+  paymentResult: {
+    id: string;
+    status: string;
+    email_address: string;
+    pricePaid: string | number;
+  };
+}): Promise<ServerActionResponse<Appointment>> {
+  // 1. Validate input
+  if (!appointmentId || !paymentResult) {
+    return {
+      success: false,
+      message: "Appointment ID and payment result are required.",
+      errorType: "validation_error",
+    };
+  }
+
+  try {
+    // 2. Update the appointment record in the database
+    // The `update` method will throw an error if the appointment is not found,
+    // which will be caught by the catch block.
+
+    const pricePaidNumber =
+      typeof paymentResult.pricePaid === "string"
+        ? parseFloat(paymentResult.pricePaid)
+        : paymentResult.pricePaid;
+
+    const updatedAppointment = await prisma.appointment.update({
+      where: {
+        appointmentId: appointmentId,
+      },
+      data: {
+        paymentResult: {
+          id: paymentResult.id,
+          status: paymentResult.status,
+          email_address: paymentResult.email_address,
+          pricePaid: pricePaidNumber,
+        },
+        paidAt: new Date(), // Set the payment timestamp to now
+        status: AppointmentStatus.BOOKING_CONFIRMED, // Update the status
+        reservationExpiresAt: null, // Clear the reservation expiry as it's now confirmed
+      },
+    });
+
+    // 3. Return a successful response with the updated data
+    return {
+      success: true,
+      message: "Appointment successfully updated to paid.",
+      data: updatedAppointment,
+    };
+  } catch (error) {
+    // 4. Handle any errors during the database update
+    console.error(
+      `Error updating appointment ${appointmentId} to paid:`,
+      error
+    );
+
+    const errorMessage =
+      error instanceof Error ? error.message : "An unknown error occurred.";
+
+    return {
+      success: false,
+      message: `Server error: ${errorMessage}`,
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function confirmCashAppointment(
+  appointmentId: string
+): Promise<ServerActionResponse> {
+  // 1. Find the appointment to ensure it exists
+  const existingAppointment = await prisma.appointment.findUnique({
+    where: { appointmentId },
+  });
+
+  if (!existingAppointment) {
+    return {
+      success: false,
+      message: "Appointment not found.",
+      errorType: "NOT_FOUND",
+    };
+  }
+
+  // 2. Verify the appointment status is 'PAYMENT_PENDING'
+  if (existingAppointment.status !== AppointmentStatus.PAYMENT_PENDING) {
+    return {
+      success: false,
+      message: `Action cannot be completed. Appointment status is '${existingAppointment.status}'.`,
+      errorType: "STATUS_CONFLICT",
+    };
+  }
+
+  try {
+    // 3. Update appointment status to CASH and clear reservation timer
+    await prisma.appointment.update({
+      where: {
+        appointmentId: existingAppointment.appointmentId,
+      },
+      data: {
+        status: AppointmentStatus.CASH,
+        paymentMethod: "CASH",
+        reservationExpiresAt: null, // Clear expiration as the slot is now confirmed
+      },
+    });
+
+    // 4. Revalidate paths to reflect the change in the UI
+    // revalidatePath(`/dashboard/appointments`);
+    // revalidatePath(`/appointments/${appointmentId}`);
+    revalidatePath(`/doctors/${existingAppointment.doctorId}`);
+    revalidatePath("/user/profile");
+
+    return {
+      success: true,
+      message: "Appointment successfully confirmed for cash payment.",
+    };
+  } catch (error) {
+    console.error("Error confirming cash appointment:", error);
+    return {
+      success: false,
+      message: "An unexpected server error occurred. Please try again.",
       errorType: "SERVER_ERROR",
     };
   }

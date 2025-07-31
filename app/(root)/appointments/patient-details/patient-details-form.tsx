@@ -111,9 +111,11 @@ export default function PatientDetailsForm({
         isForSelf: data.patientType === "MYSELF",
         phone: data.useAlternatePhone ? data.phone : patientDetails.phoneNumber,
         patientdateofbirth:
-          data.patientType === "SOMEONE_ELSE" &&
-          data.dateOfBirth &&
-          isValid(dob)
+          data.patientType === "MYSELF"
+            ? patientDetails.dateOfBirth
+            : data.patientType === "SOMEONE_ELSE" &&
+              data.dateOfBirth &&
+              isValid(dob)
             ? format(dob, "yyyy-MM-dd")
             : undefined,
       };

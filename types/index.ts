@@ -147,3 +147,8 @@ export type AppointmentSubmissionData = PatientDetailsFormValues & {
   phone: string | null | undefined;
   patientdateofbirth?: string;
 };
+
+export interface AppointmentDataWithBilling extends AppointmentData {
+  fee: number;
+  patientEmail: string;
+}
