@@ -83,7 +83,7 @@ export const users = [
   {
     name: "Admin User",
     email: "admin@clinic.com",
-    password: "hashed_admin_password_placeholder_456",
+    password: "12345",
     emailVerified: new Date(),
     role: Role.ADMIN,
     isRootAdmin: true,

@@ -4,7 +4,7 @@ import {
   PatientDetailsFormSchema,
 } from "@/lib/validators";
 import { Department, BannerImage } from "../lib/generated/prisma";
-//import { AppointmentStatus } from "../lib/generated/prisma";
+import { AppointmentStatus } from "../lib/generated/prisma";
 import { z } from "zod";
 
 export type FieldErrors = Record<string, string[] | undefined>;
@@ -151,4 +151,40 @@ export type AppointmentSubmissionData = PatientDetailsFormValues & {
 export interface AppointmentDataWithBilling extends AppointmentData {
   fee: number;
   patientEmail: string;
+}
+
+interface RevenueDataPoint {
+  name: string;
+  Revenue: number;
+}
+
+interface DepartmentRevenueDataPoint {
+  name: string;
+  value: number;
+  color: string;
+}
+
+export interface AdminTransaction {
+  id: string;
+  transactionDate: Date;
+  amount: number;
+  appointment: {
+    appointmentStartUTC: Date;
+    patientName: string;
+    status: AppointmentStatus;
+    doctor: {
+      name: string;
+      doctorProfile: {
+        specialty: string;
+      } | null;
+    };
+  };
+}
+
+export interface AdminDashboardData {
+  totalRevenue: number;
+  totalAppointments: number;
+  revenueAnalyticsData: RevenueDataPoint[];
+  departmentRevenueData: DepartmentRevenueDataPoint[];
+  transactions: AdminTransaction[];
 }
