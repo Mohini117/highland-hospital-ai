@@ -1125,3 +1125,138 @@ export async function confirmCashAppointment(
     };
   }
 }
+
+interface ConfirmationDetailsData {
+  appointment: {
+    id: string;
+    status: AppointmentStatus;
+    startDateTime: Date;
+    reason: string | null;
+    patientName: string;
+    patientEmail: string;
+    patientPhone: string;
+  };
+  doctor: {
+    name: string;
+    speciality: string;
+  };
+  transaction: {
+    gatewayTransactionId: string;
+    amount: number;
+    currency: string;
+    paymentGateway: string;
+  } | null;
+}
+
+export async function getConfirmationDetails(
+  appointmentId: string
+): Promise<ServerActionResponse<ConfirmationDetailsData>> {
+  if (!appointmentId) {
+    return {
+      success: false,
+      message: "Appointment Id is required to get confirmation details",
+      error: "No appointment Id provided",
+      errorType: "BAD_REQUEST",
+    };
+  }
+
+  try {
+    // 2. Fetch Data from Database
+    const appointmentDetails = await prisma.appointment.findUnique({
+      where: {
+        appointmentId: appointmentId,
+      },
+      include: {
+        // Include the doctor's details and their specialty from the profile
+        doctor: {
+          select: {
+            name: true,
+            doctorProfile: {
+              select: {
+                specialty: true,
+              },
+            },
+          },
+        },
+        // Include the registered user's email if available
+        user: {
+          select: {
+            email: true,
+          },
+        },
+        // Include the latest completed transaction for this appointment
+        transactions: {
+          where: {
+            status: TransactionStatus.COMPLETED,
+          },
+          orderBy: {
+            transactionDate: "desc",
+          },
+          take: 1,
+        },
+      },
+    });
+
+    // 3. Handle Not Found Case
+    if (!appointmentDetails) {
+      return {
+        success: false,
+        error: "Not Found",
+        message: "Appointment details could not be found.",
+        errorType: "NOT_FOUND",
+      };
+    }
+
+    // 4. Transform Data
+    const latestTransaction =
+      appointmentDetails.transactions.length > 0
+        ? appointmentDetails.transactions[0]
+        : null;
+
+    const data: ConfirmationDetailsData = {
+      appointment: {
+        id: appointmentDetails.appointmentId,
+        status: appointmentDetails.status,
+        startDateTime: appointmentDetails.appointmentStartUTC,
+        reason: appointmentDetails.reasonForVisit,
+        patientName: appointmentDetails.patientName,
+        // Use the registered user's email or a placeholder if it's a guest appointment
+        patientEmail: appointmentDetails.user?.email ?? "N/A",
+        // Provide a fallback for the phone number
+        patientPhone: appointmentDetails.phoneNumber ?? "N/A",
+      },
+      doctor: {
+        name: appointmentDetails.doctor.name,
+        // Provide a fallback for the doctor's specialty
+        speciality:
+          appointmentDetails.doctor.doctorProfile?.specialty ??
+          "General Physician",
+      },
+      // Map transaction details if a completed transaction exists
+      transaction: latestTransaction
+        ? {
+            gatewayTransactionId: latestTransaction.gatewayTransactionId,
+            amount: latestTransaction.amount,
+            currency: latestTransaction.currency,
+            paymentGateway: latestTransaction.paymentGateway,
+          }
+        : null,
+    };
+
+    // 5. Return Success Response
+    return {
+      success: true,
+      data: data,
+    };
+  } catch (error) {
+    // 6. Handle Server/Database Errors
+    console.error("Failed to get confirmation details:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message:
+        "An unexpected error occurred while fetching appointment details. Please try again later.",
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
