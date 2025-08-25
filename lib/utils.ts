@@ -21,3 +21,9 @@ export function getIconComponent(iconName: string): LucideIcon {
   console.warn(`Icon "${iconName}" not found. Falling back to default icon.`);
   return HelpCircle; // Default fallback icon
 }
+
+export function formatBookingId(uuid: string): string {
+  // const datePart = format(new Date(), "yyyyMMdd");
+  const seqPart = uuid.slice(-8).toUpperCase();
+  return `HH-${seqPart}`;
+}

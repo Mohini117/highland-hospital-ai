@@ -188,3 +188,25 @@ export interface AdminDashboardData {
   departmentRevenueData: DepartmentRevenueDataPoint[];
   transactions: AdminTransaction[];
 }
+
+export interface AdminAppointmentsData {
+  appointments: AdminAppointment[];
+  totalAppointments: number;
+  totalPages: number;
+  currentPage: number;
+}
+
+export interface AdminAppointment {
+  id: string;
+  formattedId: string;
+  doctorId: string;
+  doctorName: string;
+  patientName: string;
+  bookedByName: string | null;
+  bookedByEmail: string | null;
+  appointmentDate: string; // Formatted Date (e.g., "May 01, 2025")
+  appointmentTime: string; // Formatted Time (e.g., "10:00 AM")
+  status: AppointmentStatus;
+  phoneNumber?: string | null; // Alternate phone from appointment
+  userPhoneNumber?: string | null; // Primary phone from user table
+}
