@@ -506,7 +506,7 @@ export async function cancelAdminAppointment(
 
       // Find the associated Transaction
 
-      let transactionToUpdate = await tx.transaction.findFirst({
+      const transactionToUpdate = await tx.transaction.findFirst({
         where: {
           appointmentId: appointmentId,
           status: TransactionStatus.COMPLETED,

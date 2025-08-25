@@ -56,8 +56,6 @@ export default function AppointmentsTable({
   appointments,
   totalPages,
   currentPage,
-  itemsPerPage,
-  totalAppointments,
   searchQuery,
 }: AppointmentsTableProps) {
   const router = useRouter();
@@ -217,9 +215,6 @@ export default function AppointmentsTable({
     current.set("page", page.toString());
     router.push(`${pathname}?${current.toString()}`);
   };
-
-  const startIndex = (currentPage - 1) * itemsPerPage + 1;
-  const endIndex = Math.min(startIndex + itemsPerPage - 1, totalAppointments);
 
   return (
     <>
