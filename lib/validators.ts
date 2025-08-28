@@ -193,3 +193,17 @@ export const PatientDetailsFormSchema = z
       }
     }
   });
+
+export const addAdminFormSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+  email: z
+    .string()
+    .email("Invalid email address")
+    .min(3, "Email must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  // Role is assigned on the server, not submitted via form
+});
+
+export const editAdminFormSchema = z.object({
+  name: z.string().min(3, "Name must be at least 3 characters"),
+});

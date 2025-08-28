@@ -7,6 +7,10 @@ import { Department, BannerImage } from "../lib/generated/prisma";
 import { AppointmentStatus } from "../lib/generated/prisma";
 import { z } from "zod";
 
+import { Role } from "@/lib/generated/prisma";
+import { addAdminFormSchema } from "@/lib/validators";
+import { editAdminFormSchema } from "@/lib/validators";
+
 export type FieldErrors = Record<string, string[] | undefined>;
 
 export interface ServerActionResponse<T = any> {
@@ -210,3 +214,14 @@ export interface AdminAppointment {
   phoneNumber?: string | null; // Alternate phone from appointment
   userPhoneNumber?: string | null; // Primary phone from user table
 }
+
+export interface AdminUserData {
+  id: string;
+  name: string | null;
+  email: string;
+  role: Role;
+  isRootAdmin: boolean | null;
+}
+
+export type AddAdminFormValues = z.infer<typeof addAdminFormSchema>;
+export type EditAdminFormValues = z.infer<typeof editAdminFormSchema>;

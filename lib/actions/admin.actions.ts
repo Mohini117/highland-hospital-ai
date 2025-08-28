@@ -18,6 +18,15 @@ import { formatBookingId } from "@/lib/utils";
 import { toZonedTime } from "date-fns-tz";
 import { format } from "date-fns";
 
+import { AdminUserData } from "@/types";
+import { Role } from "@/lib/generated/prisma";
+
+import { addAdminFormSchema } from "@/lib/validators";
+import { hashSync } from "bcrypt-ts-edge";
+
+import { auth } from "@/auth";
+import { editAdminFormSchema } from "@/lib/validators";
+
 const getDateFilter = (dateRange?: DateRange): { gte?: Date; lte?: Date } => {
   const dateFilter: { gte?: Date; lte?: Date } = {};
   if (dateRange?.from) {
@@ -666,6 +675,313 @@ export async function getAdminAppointments({
       message: "Failed to fetch appointments.", // User-friendly
       error: message, // Technical detail
       errorType: "serverError",
+    };
+  }
+}
+
+interface AdminUsersData {
+  users: AdminUserData[];
+}
+
+export async function getAdminUsers(): Promise<
+  ServerActionResponse<AdminUsersData>
+> {
+  await requireAdmin();
+
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        role: Role.ADMIN,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isRootAdmin: true,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return {
+      success: true,
+      data: {
+        users: users.map((user) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          isRootAdmin: user.isRootAdmin,
+        })),
+      },
+    };
+  } catch (error) {
+    console.error("Error fetching admin users:", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown error fetching admin users";
+    return {
+      success: false,
+      message: "Failed to fetch admin users.",
+      error: message,
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function addAdminUser(
+  prevState: unknown, // prevState for useActionState
+  formData: FormData
+): Promise<ServerActionResponse> {
+  try {
+    await requireAdmin(); // Ensure only admins can call this
+
+    // Validate form data
+    const validatedData = addAdminFormSchema.safeParse({
+      name: formData.get("name"),
+      email: formData.get("email"),
+      password: formData.get("password"),
+    });
+
+    if (!validatedData.success) {
+      console.error(
+        "Add Admin Validation Errors:",
+        validatedData.error.flatten()
+      );
+      return {
+        success: false,
+        message: "Validation failed. Please check the information provided.", // User-friendly
+        fieldErrors: validatedData.error.flatten().fieldErrors, // Use fieldErrors
+        error: "Zod validation failed for addAdminUser.", // Technical
+        errorType: "VALIDATION_ERROR",
+      };
+    }
+
+    const { name, email, password } = validatedData.data;
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return {
+        success: false,
+        message: "This email address is already registered.", // User-friendly
+        fieldErrors: { email: ["This email address is already registered."] },
+        error: `Email conflict for: ${email}`, // Technical
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+
+    // Hash the password
+    const hashedPassword = hashSync(password, 10);
+
+    // Create the new admin user
+    await prisma.user.create({
+      data: {
+        name,
+        email,
+        password: hashedPassword,
+        role: Role.ADMIN,
+        isRootAdmin: false, // Explicitly set to false
+        emailVerified: new Date(), // Optionally mark as verified immediately
+      },
+    });
+
+    revalidatePath("/admin/settings"); // Revalidate the settings page
+
+    return { success: true, message: "Admin user created successfully." };
+  } catch (error) {
+    console.error("Error adding admin user:", error);
+    let errorMessage = "An unexpected error occurred.";
+    // Handle potential Prisma unique constraint errors specifically
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002" && error.meta?.target === "user_email_idx") {
+        // Unique constraint violation on email
+        return {
+          success: false,
+          message: "This email address is already registered.", // User-friendly
+          fieldErrors: { email: ["This email address is already registered."] },
+          error:
+            "Prisma unique constraint violation on email for addAdminUser.", // Technical
+          errorType: "CONFLICT_ERROR",
+        };
+      }
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return {
+      success: false,
+      message: "Failed to add admin user due to a server issue.", // User-friendly
+      error: `addAdminUser: ${errorMessage}`, // Technical
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function deleteAdminUser(
+  userId: string
+): Promise<ServerActionResponse> {
+  await requireAdmin(); // Ensure caller is an admin
+  const session = await auth(); // Get current admin session
+
+  if (!userId) {
+    return {
+      success: false,
+      message: "User ID is required for deletion.", // User-friendly
+      error: "deleteAdminUser: User ID was not provided.", // Technical
+      errorType: "BAD_REQUEST",
+    };
+  }
+
+  // Optional: Prevent admin from deleting themselves
+  if (session?.user?.id === userId) {
+    return {
+      success: false,
+      message: "You cannot delete your own account.",
+      error: "Attempted self-deletion.",
+      errorType: "forbidden", // Or "badRequest"
+    };
+  }
+
+  try {
+    // Check if the user being deleted is a root admin
+    const userToDelete = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { isRootAdmin: true, role: true }, // Select role too for extra check
+    });
+
+    if (!userToDelete) {
+      return {
+        success: false,
+        message: "User not found. Cannot delete.", // User-friendly
+        error: `deleteAdminUser: User with ID ${userId} not found.`, // Technical
+        errorType: "NOT_FOUND",
+      };
+    }
+
+    if (userToDelete.role !== Role.ADMIN) {
+      return {
+        success: false,
+        message: "This operation is only for deleting admin users.", // User-friendly
+        error: `deleteAdminUser: Attempted to delete non-admin user ${userId}.`, // Technical
+        errorType: "FORBIDDEN", // Or "BAD_REQUEST"
+      };
+    }
+
+    // ---- Prevent deletion of root admin ----
+    if (userToDelete.isRootAdmin) {
+      return {
+        success: false,
+        message: "Root admins cannot be deleted.",
+        error: `Attempted deletion of root admin ${userId}.`,
+        errorType: "forbidden",
+      };
+    }
+
+    // Proceed with deletion
+    await prisma.user.delete({
+      where: { id: userId },
+    });
+
+    revalidatePath("/admin/settings");
+    return { success: true, message: "Admin user deleted successfully." };
+  } catch (error) {
+    console.error(`Error deleting admin user ${userId}:`, error);
+    const techError =
+      error instanceof Error ? error.message : "Unknown error deleting user";
+    return {
+      success: false,
+      message: "Failed to delete admin user.",
+      error: techError,
+      errorType: "serverError",
+    };
+  }
+}
+
+export async function updateAdminUser(
+  prevState: unknown,
+  formData: FormData
+): Promise<ServerActionResponse> {
+  await requireAdmin();
+
+  const userId = formData.get("userId") as string;
+  const name = formData.get("name");
+
+  if (!userId) {
+    return {
+      success: false,
+      message: "User ID is missing. Cannot update user.", // User-friendly
+      error: "updateAdminUser: User ID was not provided.", // Technical
+      errorType: "BAD_REQUEST",
+    };
+  }
+
+  try {
+    // Validate form data
+    const validatedData = editAdminFormSchema.safeParse({ name });
+
+    if (!validatedData.success) {
+      console.error(
+        "[updateAdminUser Action] Validation Errors:",
+        validatedData.error.flatten()
+      );
+      return {
+        success: false,
+        message: "Validation failed. Please check the name field.", // User-friendly
+        fieldErrors: validatedData.error.flatten().fieldErrors,
+        error: "Zod validation failed for updateAdminUser.", // Technical
+        errorType: "VALIDATION_ERROR",
+      };
+    }
+
+    const { name: validatedName } = validatedData.data;
+
+    // Check if user exists (and is an admin, though role shouldn't change here)
+    const userToUpdate = await prisma.user.findUnique({
+      where: { id: userId, role: Role.ADMIN },
+      select: { id: true }, // Select minimal data needed
+    });
+
+    if (!userToUpdate) {
+      console.warn(`[updateAdminUser Action] Admin user not found: ${userId}`);
+      return {
+        success: false,
+        message: "Admin user not found. Unable to update.", // User-friendly
+        error: `updateAdminUser: Admin user with ID ${userId} not found.`, // Technical
+        errorType: "NOT_FOUND",
+      };
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        name: validatedName,
+      },
+    });
+
+    // Revalidate the path to refresh the user list
+    revalidatePath("/admin/settings");
+
+    return { success: true, message: "Admin user updated successfully." };
+  } catch (error) {
+    console.error(
+      `[updateAdminUser Action] Error updating user ${userId}:`,
+      error
+    );
+
+    const message =
+      error instanceof Error ? error.message : "Failed to update admin user.";
+
+    return {
+      success: false,
+      message: message, // User-friendly
+      error: `updateAdminUser: ${message}`, // Technical
+      errorType: "SERVER_ERROR",
     };
   }
 }
