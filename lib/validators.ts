@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { parse, isValid } from "date-fns";
 
+import * as LucideIcons from "lucide-react";
+
 export const signInFormSchema = z.object({
   // Validation for the email field
   email: z
@@ -225,5 +227,68 @@ export const addBannerSchema = z.object({
     .refine(
       (file) => ACCEPTED_IMAGE_TYPES.includes(file.type),
       "Only .jpg, .jpeg, .png, .gif and .webp formats are supported."
+    ),
+});
+
+const validIconNames = Object.keys(LucideIcons).filter(
+  (key) =>
+    typeof LucideIcons[key as keyof typeof LucideIcons] === "object" &&
+    key !== "createReactComponent" &&
+    key !== "icons" &&
+    key !== "LucideIcon" &&
+    key !== "LucideProps" &&
+    !key.includes("Logo") &&
+    [
+      "Heart",
+      "Brain",
+      "Eye",
+      "Stethoscope",
+      "Thermometer",
+      "Activity",
+      "Scissors",
+      "Bone",
+      "Baby",
+      "Pill",
+      "Syringe",
+      "Bandage",
+      "Microscope",
+      "ClipboardList",
+      "Users",
+      "FlaskConical",
+      "Dna",
+      "Ear",
+      "PersonStanding",
+    ].includes(key)
+) as (keyof typeof LucideIcons)[];
+
+export const addDepartmentSchema = z.object({
+  name: z
+    .string()
+    .min(3, "Department name must be at least 3 characters")
+    .max(50, "Department name cannot exceed 50 characters"),
+  iconName: z
+    .string()
+    .min(1, "Icon selection is required.")
+    .refine(
+      (name) => validIconNames.includes(name as keyof typeof LucideIcons),
+      {
+        message: "Invalid icon selected.",
+      }
+    ),
+});
+
+export const editDepartmentSchema = z.object({
+  name: z
+    .string()
+    .min(3, "Department name must be at least 3 characters")
+    .max(50, "Department name cannot exceed 50 characters"),
+  iconName: z
+    .string()
+    .min(1, "Icon selection is required.")
+    .refine(
+      (name) => validIconNames.includes(name as keyof typeof LucideIcons),
+      {
+        message: "Invalid icon selected.",
+      }
     ),
 });

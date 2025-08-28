@@ -10,6 +10,8 @@ import { z } from "zod";
 import { Role } from "@/lib/generated/prisma";
 import { addAdminFormSchema } from "@/lib/validators";
 import { editAdminFormSchema } from "@/lib/validators";
+import { addDepartmentSchema } from "@/lib/validators";
+import { editDepartmentSchema } from "@/lib/validators";
 
 export type FieldErrors = Record<string, string[] | undefined>;
 
@@ -225,3 +227,5 @@ export interface AdminUserData {
 
 export type AddAdminFormValues = z.infer<typeof addAdminFormSchema>;
 export type EditAdminFormValues = z.infer<typeof editAdminFormSchema>;
+export type AddDepartmentFormValues = z.infer<typeof addDepartmentSchema>;
+export type EditDepartmentFormValues = z.infer<typeof editDepartmentSchema>;

@@ -2,8 +2,10 @@ import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminSettingsClient from "../../../components/organisms/admin/admin-settings-client";
 import BannerSettings from "@/components/organisms/admin/banner-settings";
+import DepartmentSettings from "@/components/organisms/admin/department-settings";
 import { getAdminUsers } from "@/lib/actions/admin.actions";
 import { getBanners } from "@/lib/actions/settings.actions";
+import { getDepartments } from "@/lib/actions/settings.actions";
 
 interface AdminSettingsPageProps {
   searchParams: Promise<{
@@ -19,9 +21,10 @@ export default async function AdminSettingsPage({
   const resolvedSearchParams = await searchParams;
   const currentTab = resolvedSearchParams?.tab || "manage-admins";
 
-  const [adminUsersResult, bannerResult] = await Promise.all([
+  const [adminUsersResult, bannerResult, departmentResult] = await Promise.all([
     getAdminUsers(),
     getBanners(),
+    getDepartments(),
   ]);
 
   // Process admin users data concisely
@@ -42,10 +45,14 @@ export default async function AdminSettingsPage({
   if (!bannerResult.success) {
     console.error("Failed to fetch banners:", bannerResult.error);
   }
+  if (!departmentResult.success) {
+    console.error("Failed to fetch departments:", departmentResult.error);
+  }
 
   // Use nullish coalescing (??) for clean fallbacks
   const initialUsers = adminData?.users ?? [];
   const initialBanner = bannerResult.data?.banners?.[0] || null;
+  const initialDepartments = departmentResult.data?.departments ?? [];
 
   return (
     <main className="flex-1 overflow-y-auto p-8 bg-background-1">
@@ -68,6 +75,7 @@ export default async function AdminSettingsPage({
 
         <TabsContent value="other-settings" className="space-y-8">
           <BannerSettings initialBanner={initialBanner} />
+          <DepartmentSettings initialDepartments={initialDepartments} />
         </TabsContent>
       </Tabs>
     </main>

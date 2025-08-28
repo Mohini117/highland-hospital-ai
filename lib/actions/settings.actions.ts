@@ -6,6 +6,11 @@ import { requireAdmin } from "@/lib/auth-guard";
 import { revalidatePath } from "next/cache";
 import { UTApi } from "uploadthing/server";
 
+import { Prisma } from "@/lib/generated/prisma";
+import { FieldErrors } from "@/types";
+import { addDepartmentSchema } from "@/lib/validators";
+import { editDepartmentSchema } from "@/lib/validators";
+
 const utapi = new UTApi();
 
 interface GetDepartmentData {
@@ -248,6 +253,253 @@ export async function updateBannerName(
     return {
       success: false,
       message: "Failed to update banner name.",
+      error: technicalError,
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function addDepartment(
+  prevState: unknown,
+  formData: FormData
+): Promise<ServerActionResponse> {
+  await requireAdmin();
+
+  try {
+    const validatedData = addDepartmentSchema.safeParse({
+      name: formData.get("name"),
+      iconName: formData.get("iconName"),
+    });
+
+    if (!validatedData.success) {
+      return {
+        success: false,
+        message: "Validation failed. Please check the department details.",
+        fieldErrors: validatedData.error.flatten().fieldErrors as FieldErrors,
+        error: "Zod validation failed for addDepartment.",
+        errorType: "VALIDATION_ERROR",
+      };
+    }
+
+    const { name, iconName } = validatedData.data;
+
+    const existingDepartment = await prisma.department.findFirst({
+      where: { name: { equals: name, mode: "insensitive" } },
+    });
+
+    if (existingDepartment) {
+      return {
+        success: false,
+        message: "A department with this name already exists.",
+        fieldErrors: { name: ["Department name must be unique."] },
+        error: `Department name conflict for: ${name}`,
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+
+    await prisma.department.create({
+      data: {
+        name,
+        iconName,
+      },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/");
+
+    return { success: true, message: "Department added successfully." };
+  } catch (error) {
+    console.error("Error adding department:", error);
+    const technicalError =
+      error instanceof Error
+        ? error.message
+        : "Unknown error adding department";
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return {
+        success: false,
+        message: "A department with this name already exists.",
+        fieldErrors: {
+          name: ["Department name must be unique (database check)."],
+        },
+        error: technicalError,
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+    return {
+      success: false,
+      message: "Failed to add department due to a server error.",
+      error: technicalError,
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function deleteDepartment(
+  departmentId: string
+): Promise<ServerActionResponse> {
+  await requireAdmin();
+
+  if (!departmentId) {
+    return {
+      success: false,
+      message: "Department ID is required for deletion.",
+      error: "deleteDepartment: Department ID was not provided.",
+      errorType: "BAD_REQUEST",
+    };
+  }
+
+  try {
+    const departmentName = (
+      await prisma.department.findUniqueOrThrow({
+        where: { id: departmentId },
+        select: { name: true },
+      })
+    ).name;
+
+    const linkedDoctorsCount = await prisma.doctorProfile.count({
+      where: {
+        specialty: {
+          equals: departmentName,
+          mode: "insensitive",
+        },
+        isActive: true,
+      },
+    });
+
+    if (linkedDoctorsCount > 0) {
+      return {
+        success: false,
+        message: `Cannot delete department. ${linkedDoctorsCount} active doctor(s) have this specialty listed. Please update their profiles first.`,
+        error: `Deletion of department '${departmentName}' prevented due to ${linkedDoctorsCount} linked active doctor(s).`,
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+
+    await prisma.department.delete({
+      where: { id: departmentId },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/");
+
+    return { success: true, message: "Department deleted successfully." };
+  } catch (error) {
+    console.error(`Error deleting department ${departmentId}:`, error);
+    const technicalError =
+      error instanceof Error
+        ? error.message
+        : "Unknown error deleting department";
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2025"
+    ) {
+      return {
+        success: false,
+        message: "Department not found. It might have already been deleted.",
+        error: technicalError, // Prisma error message
+        errorType: "NOT_FOUND",
+      };
+    }
+    // generic error response
+    return {
+      success: false,
+      message: "Failed to delete department.",
+      error: technicalError,
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function updateDepartment(
+  prevState: unknown,
+  formData: FormData
+): Promise<ServerActionResponse> {
+  await requireAdmin();
+
+  const departmentId = formData.get("departmentId") as string;
+
+  if (!departmentId) {
+    return {
+      success: false,
+      message: "Department ID is missing. Cannot update.",
+      error: "updateDepartment: Department ID was not provided.",
+      errorType: "BAD_REQUEST",
+    };
+  }
+
+  try {
+    const validatedData = editDepartmentSchema.safeParse({
+      name: formData.get("name"),
+      iconName: formData.get("iconName"),
+    });
+
+    if (!validatedData.success) {
+      return {
+        success: false,
+        message: "Validation failed. Please check the department details.",
+        fieldErrors: validatedData.error.flatten().fieldErrors as FieldErrors,
+        error: "Zod validation failed for updateDepartment.",
+        errorType: "VALIDATION_ERROR",
+      };
+    }
+
+    const { name, iconName } = validatedData.data;
+
+    const existingDepartment = await prisma.department.findFirst({
+      where: {
+        name: { equals: name, mode: "insensitive" },
+        id: { not: departmentId },
+      },
+    });
+
+    if (existingDepartment) {
+      return {
+        success: false,
+        message: "Another department with this name already exists.",
+        fieldErrors: { name: ["Department name must be unique."] },
+        error: `Department name conflict for: ${name} (while updating ID ${departmentId})`,
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+
+    await prisma.department.update({
+      where: { id: departmentId },
+      data: {
+        name,
+        iconName,
+      },
+    });
+
+    revalidatePath("/admin/settings");
+    revalidatePath("/");
+
+    return { success: true, message: "Department updated successfully." };
+  } catch (error) {
+    console.error("Error updating department:", error);
+    const technicalError =
+      error instanceof Error
+        ? error.message
+        : "Unknown error updating department";
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return {
+        success: false,
+        message:
+          "Another department with this name already exists (database check).",
+        fieldErrors: { name: ["Department name must be unique."] },
+        error: technicalError,
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+    // generic error response
+    return {
+      success: false,
+      message: "Failed to update department due to a server error.",
       error: technicalError,
       errorType: "SERVER_ERROR",
     };
