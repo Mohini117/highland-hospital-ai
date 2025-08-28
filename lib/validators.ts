@@ -207,3 +207,23 @@ export const addAdminFormSchema = z.object({
 export const editAdminFormSchema = z.object({
   name: z.string().min(3, "Name must be at least 3 characters"),
 });
+
+const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB
+export const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+];
+
+export const addBannerSchema = z.object({
+  name: z.string().min(1, "Banner name is required."),
+  bannerImageFile: z
+    .instanceof(File, { message: "Banner image is required." })
+    .refine((file) => file.size <= MAX_FILE_SIZE, `Max image size is 4MB.`)
+    .refine(
+      (file) => ACCEPTED_IMAGE_TYPES.includes(file.type),
+      "Only .jpg, .jpeg, .png, .gif and .webp formats are supported."
+    ),
+});

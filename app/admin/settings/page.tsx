@@ -1,8 +1,9 @@
 import React from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import AdminSettingsClient from "../../../components/organisms/admin/admin-settings-client";
-
+import BannerSettings from "@/components/organisms/admin/banner-settings";
 import { getAdminUsers } from "@/lib/actions/admin.actions";
+import { getBanners } from "@/lib/actions/settings.actions";
 
 interface AdminSettingsPageProps {
   searchParams: Promise<{
@@ -18,7 +19,10 @@ export default async function AdminSettingsPage({
   const resolvedSearchParams = await searchParams;
   const currentTab = resolvedSearchParams?.tab || "manage-admins";
 
-  const [adminUsersResult] = await Promise.all([getAdminUsers()]);
+  const [adminUsersResult, bannerResult] = await Promise.all([
+    getAdminUsers(),
+    getBanners(),
+  ]);
 
   // Process admin users data concisely
   const {
@@ -34,8 +38,14 @@ export default async function AdminSettingsPage({
     console.error("Failed to fetch admin users:", adminError);
   }
 
+  // Process banners, logging errors if fetches fail
+  if (!bannerResult.success) {
+    console.error("Failed to fetch banners:", bannerResult.error);
+  }
+
   // Use nullish coalescing (??) for clean fallbacks
   const initialUsers = adminData?.users ?? [];
+  const initialBanner = bannerResult.data?.banners?.[0] || null;
 
   return (
     <main className="flex-1 overflow-y-auto p-8 bg-background-1">
@@ -57,7 +67,7 @@ export default async function AdminSettingsPage({
         </TabsContent>
 
         <TabsContent value="other-settings" className="space-y-8">
-          {/* Not yet done */}
+          <BannerSettings initialBanner={initialBanner} />
         </TabsContent>
       </Tabs>
     </main>
