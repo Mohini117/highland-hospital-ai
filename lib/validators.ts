@@ -292,3 +292,25 @@ export const editDepartmentSchema = z.object({
       }
     ),
 });
+
+export const addDoctorFormSchema = z.object({
+  name: z.string().min(3, "Doctor name must be at least 3 characters"),
+  email: z.string().email("Invalid email address"),
+  credentials: z.string().min(1, "Credentials are required"),
+  specialty: z.string().min(1, "Department/Specialty is required"),
+  languages: z.string().min(1, "Languages are required"), // Expecting comma-separated string
+  specializations: z.string().min(1, "Specializations are required"), // Expecting comma-separated string
+  brief: z.string().min(10, "About Doctor must be at least 10 characters"),
+  imageUrl: z.string().url("Invalid image URL").optional(),
+});
+
+export const editDoctorFormSchema = z.object({
+  name: z.string().min(3, "Doctor name must be at least 3 characters"),
+  email: z.string().email("Invalid email address"),
+  credentials: z.string().min(1, "Credentials are required"),
+  specialty: z.string().min(1, "Department/Specialty is required"),
+  languages: z.string().min(1, "Languages are required"),
+  specializations: z.string().min(1, "Specializations are required"),
+  brief: z.string().min(10, "About Doctor must be at least 10 characters"),
+  imageUrl: z.string().url("Invalid image URL").optional().nullable(),
+});

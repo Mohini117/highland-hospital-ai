@@ -27,6 +27,13 @@ import { hashSync } from "bcrypt-ts-edge";
 import { auth } from "@/auth";
 import { editAdminFormSchema } from "@/lib/validators";
 
+import { addDoctorFormSchema } from "@/lib/validators";
+import { editDoctorFormSchema } from "@/lib/validators";
+import { UTApi } from "uploadthing/server";
+import { extractFileKeyFromUrl } from "../uploadthing-helper";
+
+import { AdminDoctorData } from "@/types";
+
 const getDateFilter = (dateRange?: DateRange): { gte?: Date; lte?: Date } => {
   const dateFilter: { gte?: Date; lte?: Date } = {};
   if (dateRange?.from) {
@@ -982,6 +989,570 @@ export async function updateAdminUser(
       message: message, // User-friendly
       error: `updateAdminUser: ${message}`, // Technical
       errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function addDoctor(
+  prevState: unknown, // prevState for useActionState
+  formData: FormData
+): Promise<ServerActionResponse> {
+  console.log("[addDoctor Action] Received request.");
+  await requireAdmin(); // Ensure only admins can perform this action
+
+  try {
+    // --- Extract imageUrl from FormData ---
+    const imageUrl = formData.get("imageUrl") as string | null;
+
+    const validatedData = addDoctorFormSchema.safeParse({
+      name: formData.get("name"),
+      email: formData.get("email"),
+      credentials: formData.get("credentials"),
+      specialty: formData.get("specialty"),
+      languages: formData.get("languages"),
+      specializations: formData.get("specializations"),
+      brief: formData.get("brief"),
+      imageUrl: imageUrl,
+    });
+
+    if (!validatedData.success) {
+      console.error(
+        "Add Doctor Validation Errors:",
+        validatedData.error.flatten()
+      );
+      return {
+        success: false,
+        message: "Validation failed. Please check the doctor's details.", // User-friendly
+        fieldErrors: validatedData.error.flatten().fieldErrors,
+        error: "Zod validation failed for addDoctor.", // Technical
+        errorType: "VALIDATION_ERROR",
+      };
+    }
+
+    // Destructure including the validated imageUrl
+    const {
+      name,
+      email,
+      credentials,
+      specialty,
+      languages,
+      specializations,
+      brief,
+      imageUrl: validatedImageUrl, // rename
+    } = validatedData.data;
+
+    // Check if email already exists
+    const existingUser = await prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      return {
+        success: false,
+        message: "This email address is already registered.", // User-friendly
+        fieldErrors: { email: ["This email address is already registered."] },
+        error: `Email conflict for: ${email}`, // Technical
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const newUser = await tx.user.create({
+        data: {
+          name,
+          email,
+          password: null, // Set password to null for Doctor users as we are not providing them any login
+          role: Role.DOCTOR,
+          emailVerified: new Date(), //
+          image: validatedImageUrl || null,
+        },
+      });
+
+      await tx.doctorProfile.create({
+        data: {
+          userId: newUser.id,
+          specialty,
+          brief,
+          credentials: credentials,
+          languages: languages.split(",").map((lang) => lang.trim()),
+          specializations: specializations
+            .split(",")
+            .map((spec) => spec.trim()),
+          isActive: true,
+        },
+      });
+    });
+
+    revalidatePath("/admin/doctors");
+
+    return { success: true, message: "Doctor added successfully." };
+  } catch (error) {
+    console.error("Error adding doctor:", error);
+    let errorMessage = "An unexpected error occurred while adding the doctor.";
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002") {
+        return {
+          success: false,
+          message: "This email address is already registered.", // User-friendly
+          fieldErrors: { email: ["This email address is already registered."] },
+          error: "Prisma unique constraint violation on email for addDoctor.", // Technical
+          errorType: "CONFLICT_ERROR",
+        };
+      }
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return {
+      success: false,
+      message: "Failed to add doctor due to a server issue.", // User-friendly
+      error: `addDoctor: ${errorMessage}`, // Technical
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function updateDoctor(
+  prevState: unknown, // prevState for useActionState
+  formData: FormData
+): Promise<ServerActionResponse> {
+  await requireAdmin(); // Ensure only admins can perform this action
+  const utapi = new UTApi();
+  const doctorId = formData.get("doctorId") as string;
+  if (!doctorId) {
+    return {
+      success: false,
+      message: "Doctor ID is missing. Cannot update profile.", // User-friendly
+      error: "updateDoctor: Doctor ID was not provided.", // Technical
+      errorType: "BAD_REQUEST",
+    };
+  }
+
+  try {
+    const imageUrl = formData.get("imageUrl") as string | null;
+
+    const validatedData = editDoctorFormSchema.safeParse({
+      name: formData.get("name"),
+      email: formData.get("email"),
+      credentials: formData.get("credentials"),
+      specialty: formData.get("specialty"),
+      languages: formData.get("languages"),
+      specializations: formData.get("specializations"),
+      brief: formData.get("brief"),
+      imageUrl: imageUrl,
+    });
+
+    if (!validatedData.success) {
+      console.error(
+        "Update Doctor Validation Errors:",
+        validatedData.error.flatten()
+      );
+      return {
+        success: false,
+        message: "Validation failed. Please check the doctor's details.", // User-friendly
+        fieldErrors: validatedData.error.flatten().fieldErrors,
+        error: "Zod validation failed for updateDoctor.", // Technical
+        errorType: "VALIDATION_ERROR",
+      };
+    }
+
+    const {
+      name,
+      email: newEmail,
+      credentials,
+      specialty,
+      languages,
+      specializations,
+      brief,
+      imageUrl: newImageUrl,
+    } = validatedData.data;
+
+    // Fetch the current doctor data including the current email
+    const currentDoctor = await prisma.user.findUnique({
+      where: { id: doctorId },
+      select: { image: true, email: true },
+    });
+
+    if (!currentDoctor) {
+      return {
+        success: false,
+        message: "Doctor profile not found. Unable to update.", // User-friendly
+        error: `updateDoctor: Doctor with ID ${doctorId} not found.`, // Technical
+        errorType: "NOT_FOUND",
+      };
+    }
+
+    const oldImageUrl = currentDoctor.image;
+    const oldEmail = currentDoctor.email;
+    const imageNeedsUpdate = newImageUrl !== oldImageUrl;
+    const emailNeedsUpdate = newEmail !== oldEmail;
+
+    // --- Check Email Uniqueness if Changed ---
+    if (emailNeedsUpdate) {
+      const existingUserWithNewEmail = await prisma.user.findUnique({
+        where: { email: newEmail },
+        select: { id: true }, // Only need ID to check existence
+      });
+      // Check if the email exists AND belongs to a DIFFERENT user
+      if (
+        existingUserWithNewEmail &&
+        existingUserWithNewEmail.id !== doctorId
+      ) {
+        return {
+          success: false,
+          message: "This email address is already registered to another user.", // User-friendly
+          fieldErrors: {
+            email: [
+              "This email address is already registered to another user.",
+            ],
+          },
+          error: `Email conflict during update for doctor ${doctorId}, new email: ${newEmail}`, // Technical
+          errorType: "CONFLICT_ERROR",
+        };
+      }
+    }
+    // --- End Email Uniqueness Check ---
+
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: doctorId },
+        data: {
+          name,
+          ...(imageNeedsUpdate && { image: newImageUrl || null }),
+          ...(emailNeedsUpdate && { email: newEmail }), // <--- Update email if changed
+        },
+      });
+
+      // Update DoctorProfile table
+      await tx.doctorProfile.update({
+        where: { userId: doctorId },
+        data: {
+          specialty,
+          brief,
+          credentials,
+          languages: languages.split(",").map((lang) => lang.trim()),
+          specializations: specializations
+            .split(",")
+            .map((spec) => spec.trim()),
+        },
+      });
+    });
+
+    // Delete old image from UploadThing if a new one was provided and it's different
+    if (imageNeedsUpdate && oldImageUrl) {
+      const oldFileKey = extractFileKeyFromUrl(oldImageUrl);
+      if (oldFileKey) {
+        try {
+          console.log(
+            `[updateDoctor] Deleting old image with key: ${oldFileKey}`
+          );
+          await utapi.deleteFiles(oldFileKey);
+        } catch (deleteError) {
+          console.error(
+            `[updateDoctor] Failed to delete old image ${oldFileKey}:`,
+            deleteError
+          );
+        }
+      }
+    }
+
+    revalidatePath("/admin/doctors");
+
+    return { success: true, message: "Doctor updated successfully." };
+  } catch (error) {
+    console.error(`[updateDoctor] Error updating doctor ${doctorId}:`, error);
+    let errorMessage = "Failed to update doctor.";
+    // Specific check for Prisma unique constraint error on email during update
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      if (error.code === "P2002" && error.meta?.target === "user_email_idx") {
+        return {
+          success: false,
+          message: "This email address is already registered to another user.", // User-friendly
+          fieldErrors: {
+            email: [
+              "This email address is already registered to another user.",
+            ],
+          },
+          error:
+            "Prisma unique constraint violation on email for updateDoctor.", // Technical
+          errorType: "CONFLICT_ERROR",
+        };
+      }
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return {
+      success: false,
+      message: "Failed to update doctor profile due to a server issue.", // User-friendly
+      error: `updateDoctor: ${errorMessage}`, // Technical
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+interface AdminDoctorsData {
+  doctors: AdminDoctorData[];
+}
+
+export async function getAdminDoctors(): Promise<
+  ServerActionResponse<AdminDoctorsData>
+> {
+  await requireAdmin(); // Ensure only admins can call this
+
+  const whereClause: Prisma.UserWhereInput = {
+    role: Role.DOCTOR,
+    doctorProfile: {
+      isActive: true,
+    },
+  };
+
+  try {
+    // Fetch ALL doctors matching the criteria
+    const doctors = await prisma.user.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        doctorProfile: {
+          select: {
+            specialty: true,
+            isActive: true,
+            languages: true,
+            specializations: true,
+            brief: true,
+            credentials: true,
+          },
+        },
+      },
+      orderBy: {
+        name: "asc", // Order by name
+      },
+    });
+
+    // Format the data
+    const formattedDoctors: AdminDoctorData[] = doctors.map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      credentials: doc.doctorProfile?.credentials ?? null,
+      email: doc.email,
+      image: doc.image,
+      specialty: doc.doctorProfile?.specialty ?? null,
+      isActive: doc.doctorProfile?.isActive ?? null,
+      languages: doc.doctorProfile?.languages ?? null,
+      specializations: doc.doctorProfile?.specializations ?? null,
+      brief: doc.doctorProfile?.brief ?? null,
+    }));
+
+    // RETURN only the doctors array
+    return {
+      success: true,
+      data: { doctors: formattedDoctors }, // Wrap in data
+    };
+  } catch (error) {
+    console.error("Error fetching admin doctors:", error);
+    const message =
+      error instanceof Error ? error.message : "Unknown error fetching doctors";
+    return {
+      success: false,
+      message: "Failed to fetch doctors.",
+      error: message,
+      errorType: "serverError",
+    };
+  }
+}
+
+export async function deleteDoctor(
+  doctorId: string
+): Promise<ServerActionResponse> {
+  await requireAdmin();
+  const utapi = new UTApi();
+
+  if (!doctorId) {
+    return {
+      success: false,
+      message: "Doctor ID is required.",
+      error: "Doctor ID is required.",
+    };
+  }
+
+  try {
+    const now = new Date();
+    const futureAppointmentCount = await prisma.appointment.count({
+      where: {
+        doctorId: doctorId,
+        appointmentStartUTC: { gte: now },
+        status: {
+          in: [AppointmentStatus.BOOKING_CONFIRMED, AppointmentStatus.CASH],
+        },
+      },
+    });
+
+    if (futureAppointmentCount > 0) {
+      return {
+        success: false,
+        message:
+          "Cannot deactivate doctor. They have future appointments that must be cancelled first.",
+        errorType: "CONFLICT_ERROR",
+      };
+    }
+
+    // Find the doctor to get their image URL
+    const doctorToDeactivate = await prisma.user.findUnique({
+      where: { id: doctorId, role: Role.DOCTOR },
+      select: { image: true },
+    });
+
+    if (!doctorToDeactivate) {
+      return {
+        success: false,
+        message: "Doctor not found.",
+        errorType: "NOT_FOUND",
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Set the User record to inactive
+      await tx.user.update({
+        where: { id: doctorId },
+        data: { isActive: false },
+      });
+      // Also set their profile to inactive
+      await tx.doctorProfile.update({
+        where: { userId: doctorId },
+        data: { isActive: false },
+      });
+    });
+
+    // delete the doctor image from uploadthing
+    const imageUrlToDelete = doctorToDeactivate.image;
+    if (imageUrlToDelete) {
+      const fileKey = extractFileKeyFromUrl(imageUrlToDelete);
+      if (fileKey) {
+        await utapi.deleteFiles(fileKey).catch((err) => {
+          console.error("Failed to delete image from UploadThing", err);
+        });
+      }
+    }
+
+    revalidatePath("/admin/doctors");
+    return { success: true, message: "Doctor deactivated successfully." };
+  } catch (error) {
+    const techError =
+      error instanceof Error ? error.message : "Unknown error deleting doctor";
+    return {
+      success: false,
+      message: "Failed to delete doctor.",
+      error: techError,
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+interface ActiveAppointmentDetail {
+  id: string;
+  date: string;
+  time: string;
+  patientName: string | null;
+  patientPhone: string | null;
+  patientEmail: string | null;
+  status: AppointmentStatus; // Include status for clarity
+}
+
+interface CheckAppointmentsData {
+  hasActiveAppointments: boolean;
+  appointments: ActiveAppointmentDetail[] | null;
+}
+
+export async function checkDoctorAppointments(
+  prevState: unknown,
+  doctorId: string
+): Promise<ServerActionResponse<CheckAppointmentsData>> {
+  await requireAdmin(); // Ensure caller is an admin
+  const TIMEZONE = getAppTimeZone();
+  if (!doctorId) {
+    return {
+      success: false,
+      message: "Doctor ID is required.",
+      error: "Doctor ID missing in checkDoctorAppointments.",
+      errorType: "badRequest",
+    };
+  }
+
+  try {
+    // Find appointments with the specified statuses
+    const activeAppointments = await prisma.appointment.findMany({
+      where: {
+        doctorId: doctorId,
+        status: {
+          in: [
+            AppointmentStatus.BOOKING_CONFIRMED,
+            AppointmentStatus.CASH,
+            // DO NOT include CANCELLED, COMPLETED, NO_SHOW here
+          ],
+        },
+      },
+      select: {
+        appointmentId: true,
+        appointmentStartUTC: true,
+        patientName: true,
+        phoneNumber: true,
+        status: true, // Select status to potentially display if needed
+        user: {
+          select: {
+            email: true,
+            phoneNumber: true,
+          },
+        },
+      },
+      orderBy: {
+        appointmentStartUTC: "asc", // Keep ordering by date
+      },
+    });
+
+    const hasActiveAppointments = activeAppointments.length > 0;
+
+    if (!hasActiveAppointments) {
+      // Return early if no active appointments found
+      return {
+        success: true,
+        data: { hasActiveAppointments: false, appointments: null },
+      };
+    }
+
+    // Format the appointments for display
+    const formattedAppointments: ActiveAppointmentDetail[] =
+      activeAppointments.map((apt) => {
+        const localStartTime = toZonedTime(apt.appointmentStartUTC, TIMEZONE);
+        return {
+          id: apt.appointmentId,
+          date: format(localStartTime, "MMM dd, yyyy"),
+          time: format(localStartTime, "hh:mm a"),
+          patientName: apt.patientName,
+          patientPhone: apt.phoneNumber || apt.user?.phoneNumber || null,
+          patientEmail: apt.user?.email || null,
+          status: apt.status, // Include status in formatted data
+        };
+      });
+
+    // Return the result with the list of active appointments
+    return {
+      success: true,
+      data: {
+        hasActiveAppointments: true,
+        appointments: formattedAppointments,
+      },
+    };
+  } catch (error) {
+    const techError =
+      error instanceof Error
+        ? error.message
+        : "Unknown error checking appointments";
+    return {
+      success: false,
+      message: "Failed to check for doctor appointments.",
+      error: techError,
+      errorType: "serverError",
     };
   }
 }

@@ -101,6 +101,7 @@ export async function getDoctorDetails(
       where: {
         id: doctorId,
         role: "DOCTOR",
+        isActive: true, //<--- ADD THIS LINE
       },
       select: {
         id: true,

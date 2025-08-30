@@ -13,6 +13,9 @@ import { editAdminFormSchema } from "@/lib/validators";
 import { addDepartmentSchema } from "@/lib/validators";
 import { editDepartmentSchema } from "@/lib/validators";
 
+import { addDoctorFormSchema } from "@/lib/validators";
+import { editDoctorFormSchema } from "@/lib/validators";
+
 export type FieldErrors = Record<string, string[] | undefined>;
 
 export interface ServerActionResponse<T = any> {
@@ -229,3 +232,19 @@ export type AddAdminFormValues = z.infer<typeof addAdminFormSchema>;
 export type EditAdminFormValues = z.infer<typeof editAdminFormSchema>;
 export type AddDepartmentFormValues = z.infer<typeof addDepartmentSchema>;
 export type EditDepartmentFormValues = z.infer<typeof editDepartmentSchema>;
+
+export type AddDoctorFormValues = z.infer<typeof addDoctorFormSchema>;
+
+export interface AdminDoctorData {
+  id: string;
+  name: string | null;
+  email: string;
+  credentials: string | null; // From DoctorProfile
+  image: string | null;
+  specialty: string | null; // From DoctorProfile
+  isActive: boolean | null; // From DoctorProfile
+  languages: string[] | null; //From DoctorProfile
+  specializations: string[] | null; // From DoctorProfile
+  brief: string | null; // From DoctorProfile
+}
+export type EditDoctorFormValues = z.infer<typeof editDoctorFormSchema>;
