@@ -15,6 +15,7 @@ import { editDepartmentSchema } from "@/lib/validators";
 
 import { addDoctorFormSchema } from "@/lib/validators";
 import { editDoctorFormSchema } from "@/lib/validators";
+import { LeaveType } from "@/lib/generated/prisma";
 
 export type FieldErrors = Record<string, string[] | undefined>;
 
@@ -248,3 +249,23 @@ export interface AdminDoctorData {
   brief: string | null; // From DoctorProfile
 }
 export type EditDoctorFormValues = z.infer<typeof editDoctorFormSchema>;
+
+export interface InitialLeave {
+  date: string;
+  type: LeaveType;
+}
+
+export interface AppointmentDetailForLeave {
+  id: string; // appointmentId
+  time: string;
+  patientName: string | null;
+  bookedByName?: string | null; // Name of user who booked
+  phoneNumber: string | null;
+  email: string | null;
+  status: AppointmentStatus;
+}
+
+export interface AdminDoctorDataSimple {
+  id: string;
+  name: string | null;
+}

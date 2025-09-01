@@ -34,6 +34,14 @@ import { extractFileKeyFromUrl } from "../uploadthing-helper";
 
 import { AdminDoctorData } from "@/types";
 
+import { getDoctorAppointmentsForDateInternal } from "./shared.actions";
+import { AppointmentDetailForLeave } from "@/types";
+import { LeaveType } from "@/lib/generated/prisma";
+
+import { AdminDoctorDataSimple } from "@/types";
+
+import { InitialLeave } from "@/types";
+
 const getDateFilter = (dateRange?: DateRange): { gte?: Date; lte?: Date } => {
   const dateFilter: { gte?: Date; lte?: Date } = {};
   if (dateRange?.from) {
@@ -1552,6 +1560,284 @@ export async function checkDoctorAppointments(
       success: false,
       message: "Failed to check for doctor appointments.",
       error: techError,
+      errorType: "serverError",
+    };
+  }
+}
+
+interface DoctorAppointmentsData {
+  appointments: AppointmentDetailForLeave[];
+}
+
+export async function getDoctorAppointmentsForDate(
+  doctorId: string,
+  dateStr: string
+): Promise<ServerActionResponse<DoctorAppointmentsData>> {
+  await requireAdmin();
+  const TIMEZONE = getAppTimeZone();
+  if (!doctorId || !dateStr) {
+    return {
+      success: false,
+      message: "Doctor ID and date are required to fetch appointments.", // User-friendly
+      error: "getDoctorAppointmentsForDate: Missing doctorId or dateStr.", // Technical
+      errorType: "BAD_REQUEST",
+    };
+  }
+
+  try {
+    const appointments = await getDoctorAppointmentsForDateInternal(
+      doctorId,
+      dateStr
+    );
+
+    // Format for client consumption
+    const formattedAppointments = appointments.map((apt) => {
+      const localStartTime = toZonedTime(apt.appointmentStartUTC, TIMEZONE);
+      return {
+        id: apt.appointmentId,
+        time: format(localStartTime, "hh:mm a"),
+        patientName: apt.patientName,
+        bookedByName: apt.user?.name,
+        phoneNumber: (apt.phoneNumber || apt.user?.phoneNumber) ?? null, // Get phone from appointment or user profile
+        email: apt.user?.email ?? null, // Get email from related user
+        status: apt.status,
+      };
+    });
+
+    return {
+      success: true,
+      data: { appointments: formattedAppointments }, // <-- Wrap in data
+    };
+  } catch (error) {
+    console.error(
+      `Error fetching appointments for doctor ${doctorId} on ${dateStr}:`,
+      error
+    );
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown error fetching appointments";
+    return {
+      success: false,
+      message: "Failed to fetch appointments.",
+      error: message,
+      errorType: "serverError",
+    };
+  }
+}
+
+export async function updateDoctorLeave(
+  doctorId: string,
+  leaves: Record<string, LeaveType | "WORKING">
+): Promise<ServerActionResponse> {
+  await requireAdmin(); // Ensure admin access
+
+  if (!doctorId || !leaves) {
+    return {
+      success: false,
+      message: "Doctor ID and leave data are required.",
+      error: "Missing required parameters for updateDoctorLeave.",
+      errorType: "badRequest",
+    };
+  }
+
+  try {
+    // Use a transaction to ensure atomicity
+    await prisma.$transaction(async (tx) => {
+      console.log("[updateDoctorLeave] Starting transaction...");
+      // --- Conflict Check ---
+      for (const dateStr in leaves) {
+        const leaveType = leaves[dateStr];
+        console.log(
+          `[updateDoctorLeave] Processing date: ${dateStr}, type: ${leaveType}`
+        );
+
+        // Only check conflicts if marking for leave (not 'WORKING')
+        if (leaveType !== "WORKING") {
+          console.log(
+            `[updateDoctorLeave] Checking conflicts for ${dateStr}...`
+          );
+          // Fetch conflicting appointments based on leave type
+          const conflictingAppointments =
+            await getDoctorAppointmentsForDateInternal(
+              doctorId,
+              dateStr,
+              leaveType // Pass leave type to filter relevant times
+            );
+          console.log(
+            `[updateDoctorLeave] Found ${conflictingAppointments.length} conflicting appointments for ${dateStr}`
+          );
+
+          if (conflictingAppointments.length > 0) {
+            // If conflicts found, throw an error to rollback the transaction
+            throw new Error(
+              `Cannot mark leave for ${dateStr}. Existing appointments found. Please cancel them first.`
+            );
+          }
+        }
+      }
+      // --- End Conflict Check ---
+
+      // If no conflicts found, proceed with updates/deletes
+      console.log(
+        "[updateDoctorLeave] No conflicts found. Proceeding with DB operations..."
+      );
+      for (const dateStr in leaves) {
+        const leaveType = leaves[dateStr];
+        // Create a Date object explicitly representing midnight UTC for the given date string
+        // This avoids timezone ambiguities when interacting with Prisma/DB
+        const leaveDateUtc = new Date(dateStr + "T00:00:00.000Z");
+
+        if (leaveType === "WORKING") {
+          console.log(
+            `[updateDoctorLeave] Deleting leave record for ${dateStr}`
+          );
+          // Delete the leave record if it exists for this date
+          await tx.doctorLeave.deleteMany({
+            where: {
+              doctorId: doctorId,
+              leaveDate: leaveDateUtc,
+            },
+          });
+        } else {
+          console.log(
+            `[updateDoctorLeave] Upserting leave record for ${dateStr} with type ${leaveType}`
+          );
+          // Upsert (create or update) the leave record
+          await tx.doctorLeave.upsert({
+            where: {
+              // Need a unique constraint for upsert, e.g., doctorId + leaveDate
+              doctorId_leaveDate: {
+                doctorId: doctorId,
+                leaveDate: leaveDateUtc,
+              },
+            },
+            update: {
+              leaveType: leaveType,
+            },
+            create: {
+              doctorId: doctorId,
+              leaveDate: leaveDateUtc,
+              leaveType: leaveType,
+            },
+          });
+        }
+      }
+      console.log("[updateDoctorLeave] Transaction completed successfully.");
+    }); // End transaction
+
+    // Revalidate relevant paths after successful transaction
+    revalidatePath(`/admin/doctors/${doctorId}/manage`);
+    revalidatePath(`/doctors/${doctorId}`);
+
+    return { success: true, message: "Leave updated successfully." };
+  } catch (error) {
+    console.error(`Error updating leave for doctor ${doctorId}:`, error);
+
+    return {
+      success: false,
+      message: "Failed to update leave due to a server issue.",
+      error: error instanceof Error ? error.message : "Unknown  server error",
+      errorType: "SERVER_ERROR",
+    };
+  }
+}
+
+export async function getAdminDoctorById(
+  doctorId: string
+): Promise<ServerActionResponse<AdminDoctorDataSimple>> {
+  await requireAdmin(); // Ensure admin access
+
+  if (!doctorId) {
+    return {
+      success: false,
+      message: "Doctor not found.",
+      error: `Doctor ${doctorId} not found.`,
+      errorType: "notFound",
+    };
+  }
+
+  try {
+    const doctor = await prisma.user.findUnique({
+      where: { id: doctorId, role: Role.DOCTOR, isActive: true }, // Ensure it's a doctor
+      select: {
+        id: true,
+        name: true,
+      },
+    });
+
+    if (!doctor) {
+      return { success: false, error: "Doctor not found." };
+    }
+
+    return {
+      success: true,
+      data: { id: doctor.id, name: doctor.name }, // <-- Wrap in data
+    };
+  } catch (error) {
+    console.error(`Error fetching doctor details for ${doctorId}:`, error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unknown error fetching doctor details";
+    return {
+      success: false,
+      message: "Failed to fetch doctor details.",
+      error: message,
+      errorType: "serverError",
+    };
+  }
+}
+
+interface GetLeavesData {
+  leaves: InitialLeave[];
+}
+
+export async function getDoctorLeaves(
+  doctorId: string
+): Promise<ServerActionResponse<GetLeavesData>> {
+  if (!doctorId) {
+    return {
+      success: false,
+      message: "Doctor ID is required.", // User-friendly message
+      error: "Doctor ID missing for getDoctorLeaves.", // Technical detail
+      errorType: "badRequest",
+    };
+  }
+
+  try {
+    const leaves = await prisma.doctorLeave.findMany({
+      where: { doctorId },
+      select: {
+        leaveDate: true,
+        leaveType: true,
+      },
+      orderBy: {
+        leaveDate: "asc",
+      },
+    });
+
+    // Format the leave dates to 'yyyy-MM-dd' strings
+    const formattedLeaves = leaves.map((leave) => ({
+      date: format(leave.leaveDate, "yyyy-MM-dd"), // Format Date object to string
+      type: leave.leaveType,
+    }));
+
+    return {
+      success: true,
+      message: "Doctor leaves fetched successfully.",
+      data: { leaves: formattedLeaves }, // Wrap data in 'data' field
+    };
+  } catch (error) {
+    console.error(`Error fetching leaves for doctor ${doctorId}:`, error);
+    const techError =
+      error instanceof Error
+        ? error.message
+        : "Unknown database error fetching leaves.";
+    return {
+      success: false,
+      message: "Failed to fetch doctor's leave records.", // User-friendly message
+      error: techError, // Technical detail
       errorType: "serverError",
     };
   }
