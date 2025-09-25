@@ -24,7 +24,7 @@ export default function PayPalCheckoutButton({
 
   if (isPending) {
     return (
-      <div className="text-center h-12 felx items-center justify-center my-4 text-muted-foreground">
+      <div className="text-center h-12 flex items-center justify-center my-4 text-muted-foreground">
         Loading Paypal...
       </div>
     );
